@@ -67,6 +67,43 @@
     return Store.delete("mapping_profiles", kaynak);
   }
 
+  // ---------- Özel (kullanıcı tanımlı) kaynaklar ----------
+  // "Yeni Excel Türü Ekle" ile oluşturulan, TC Kimlik No üzerinden kişilere
+  // bağlanan, VAR/YOK veya maliyet anlamı taşımayan genel ek bilgi kaynakları.
+
+  function getCustomKaynaklar() {
+    return Store.getAll("custom_kaynaklar").then((list) => list.sort((a, b) => (a.olusturma_tarihi || "").localeCompare(b.olusturma_tarihi || "")));
+  }
+
+  function saveCustomKaynak(kaynak) {
+    return Store.put("custom_kaynaklar", kaynak);
+  }
+
+  /** Kaynak tanımını ve o kaynağa ait tüm içe aktarılmış veriyi siler. */
+  async function deleteCustomKaynak(kaynakId) {
+    const veriler = await Store.getAll("custom_veriler");
+    const kalanlar = veriler.filter((v) => v.kaynak_id !== kaynakId);
+    await Store.clear("custom_veriler");
+    if (kalanlar.length) await Store.putMany("custom_veriler", kalanlar);
+    await Store.delete("custom_kaynaklar", kaynakId);
+  }
+
+  /** Bir özel kaynak satırını upsert eder — id = kaynak_id + tc_kimlik_no. */
+  async function upsertCustomVeri(kaynakId, tcKimlikNo, alanlar, kaynakDosya, importId) {
+    const id = `${kaynakId}__${tcKimlikNo}`;
+    const kayit = {
+      id,
+      kaynak_id: kaynakId,
+      tc_kimlik_no: tcKimlikNo,
+      alanlar,
+      kaynak_dosya: kaynakDosya,
+      import_id: importId,
+      guncelleme_tarihi: N.todayIso(),
+    };
+    await Store.put("custom_veriler", kayit);
+    return kayit;
+  }
+
   /** tc_kimlik_no + havalimani -> deterministik apron_kartlari id */
   function kartId(tcKimlikNo, havalimani) {
     return `${tcKimlikNo}__${havalimani}`;
@@ -207,16 +244,18 @@
    * edilmesin).
    */
   async function buildPivotRows() {
-    const [personelList, kartlar, egitimler, settings] = await Promise.all([
+    const [personelList, kartlar, egitimler, ozelVeriler, settings] = await Promise.all([
       Store.getAll("personel"),
       Store.getAll("apron_kartlari"),
       Store.getAll("egitim_kayitlari"),
+      Store.getAll("custom_veriler"),
       getSettings(),
     ]);
 
     const personelByTc = new Map(personelList.map((p) => [p.tc_kimlik_no, p]));
     const kartlarByTc = groupBy(kartlar, "tc_kimlik_no");
     const egitimlerByTc = groupBy(egitimler, "tc_kimlik_no");
+    const ozelByTc = groupBy(ozelVeriler, "tc_kimlik_no");
 
     // Not: personelList kasıtlı olarak dahil edilmiyor — yalnızca en az bir
     // havalimanında apron kartı (veya ondan türeyen eğitim kaydı) olan
@@ -229,6 +268,11 @@
       const kendiKartlari = kartlarByTc.get(tc) || [];
       const kendiEgitimleri = egitimlerByTc.get(tc) || [];
       const guncelEgitim = enGuncelEgitim(kendiEgitimleri);
+
+      // Özel kaynaklardan gelen veri: { [kaynak_id]: { [alanKey]: değer, ... } }
+      const kendiOzelVeri = ozelByTc.get(tc) || [];
+      const ozel = {};
+      kendiOzelVeri.forEach((v) => (ozel[v.kaynak_id] = v.alanlar));
 
       const kartByHavalimani = {};
       HAVALIMANLARI.forEach((h) => {
@@ -258,6 +302,7 @@
         egitim_kayitlari: kendiEgitimleri,
         guncel_egitim: guncelEgitim,
         egitim_durumu: egitimDurumu(guncelEgitim, settings.uyari_esik_gun),
+        custom: ozel,
       });
     }
 
@@ -297,5 +342,9 @@
     enGuncelEgitim,
     egitimDurumu,
     buildPivotRows,
+    getCustomKaynaklar,
+    saveCustomKaynak,
+    deleteCustomKaynak,
+    upsertCustomVeri,
   };
 })(window);

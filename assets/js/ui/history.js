@@ -6,11 +6,16 @@
 
   const { escapeHtml } = global.Apron.util;
   const { Store } = global.Apron.DB;
+  const Model = global.Apron.model;
   const KAYNAKLAR = global.Apron.mapping.KAYNAKLAR;
 
   async function render(root, isActive = () => true) {
-    const imports = (await Store.getAll("imports")).sort((a, b) => new Date(b.tarih) - new Date(a.tarih));
+    const [imports, customKaynaklar] = await Promise.all([Store.getAll("imports"), Model.getCustomKaynaklar()]);
+    imports.sort((a, b) => new Date(b.tarih) - new Date(a.tarih));
     if (!isActive()) return; // kullanıcı bu sırada başka bir sekmeye geçti
+
+    const ozelAdlar = {};
+    customKaynaklar.forEach((k) => (ozelAdlar[k.id] = k.ad));
 
     root.innerHTML = `
       <div class="page">
@@ -26,7 +31,7 @@
             <tbody>
               ${
                 imports.length
-                  ? imports.map(rowHtml).join("")
+                  ? imports.map((imp) => rowHtml(imp, ozelAdlar)).join("")
                   : `<tr><td colspan="7"><div class="table-empty">Henüz içe aktarma yapılmadı.</div></td></tr>`
               }
             </tbody>
@@ -36,13 +41,14 @@
     `;
   }
 
-  function rowHtml(imp) {
+  function rowHtml(imp, ozelAdlar) {
     const tarih = new Date(imp.tarih);
     const tarihStr = `${pad(tarih.getDate())}.${pad(tarih.getMonth() + 1)}.${tarih.getFullYear()} ${pad(tarih.getHours())}:${pad(tarih.getMinutes())}`;
+    const kaynakAdi = (KAYNAKLAR[imp.kaynak] || {}).etiket || ozelAdlar[imp.kaynak] || imp.kaynak;
     return `
       <tr>
         <td class="mono">${tarihStr}</td>
-        <td>${escapeHtml((KAYNAKLAR[imp.kaynak] || {}).etiket || imp.kaynak)}</td>
+        <td>${escapeHtml(kaynakAdi)}</td>
         <td>${escapeHtml(imp.dosya_adi)}</td>
         <td class="mono">${imp.toplam_satir ?? "—"}</td>
         <td class="mono">${imp.eklenen ?? "—"}</td>

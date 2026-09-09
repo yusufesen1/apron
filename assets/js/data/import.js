@@ -151,6 +151,68 @@
     return importRecord;
   }
 
+  /**
+   * "Yeni Excel Türü Ekle" ile tanımlanmış özel bir kaynağı içe aktarır.
+   * Sabit 4 kaynaktan farkı: hedef şema yok, kullanıcının seçtiği sütunlar
+   * olduğu gibi (metin olarak) alınır; tek zorunlu alan TC Kimlik No'dur.
+   * @param {File} file
+   * @param {{id:string, ad:string, tc_sutun:string, alanlar:{excel_sutun:string,etiket:string,key:string}[]}} kaynakDef
+   */
+  async function importCustomFile(file, kaynakDef) {
+    const buf = await file.arrayBuffer();
+    const { rows, sheetName } = readWorkbook(buf);
+
+    if (!rows.length) {
+      throw new Error(`"${file.name}" içinde okunabilir satır bulunamadı (sayfa: ${sheetName}).`);
+    }
+
+    let eklenen = 0;
+    let guncellenen = 0;
+    let atlanan = 0;
+    const hatalar = [];
+
+    const importRecordDraft = {
+      kaynak: kaynakDef.id,
+      dosya_adi: file.name,
+      tarih: new Date().toISOString(),
+      toplam_satir: rows.length,
+    };
+    const importId = await Store.put("imports", importRecordDraft);
+
+    for (let i = 0; i < rows.length; i++) {
+      const raw = rows[i];
+      const isRowEmpty = Object.values(raw).every((v) => v === "" || v == null);
+      if (isRowEmpty) continue;
+
+      const headerIndex = {};
+      Object.keys(raw).forEach((h) => (headerIndex[normalizeHeader(h)] = h));
+
+      const tcKey = headerIndex[normalizeHeader(kaynakDef.tc_sutun)];
+      const tcKimlikNo = tcKey !== undefined ? N.cleanId(raw[tcKey]) : "";
+
+      if (!tcKimlikNo) {
+        atlanan++;
+        hatalar.push(`Satır ${i + 2}: TC Kimlik No okunamadı, satır atlandı.`);
+        continue;
+      }
+
+      const alanlar = {};
+      kaynakDef.alanlar.forEach((alan) => {
+        const key = headerIndex[normalizeHeader(alan.excel_sutun)];
+        alanlar[alan.key] = key !== undefined ? N.cleanText(raw[key]) : "";
+      });
+
+      const existing = await Store.get("custom_veriler", `${kaynakDef.id}__${tcKimlikNo}`);
+      await Model.upsertCustomVeri(kaynakDef.id, tcKimlikNo, alanlar, file.name, importId);
+      if (existing) guncellenen++;
+      else eklenen++;
+    }
+
+    const importRecord = Object.assign({}, importRecordDraft, { id: importId, eklenen, guncellenen, atlanan, hatalar });
+    await Store.put("imports", importRecord);
+    return importRecord;
+  }
+
   global.Apron = global.Apron || {};
-  global.Apron.importer = { importFile, readWorkbook, mapRow, normalizeHeader };
+  global.Apron.importer = { importFile, importCustomFile, readWorkbook, mapRow, normalizeHeader };
 })(window);

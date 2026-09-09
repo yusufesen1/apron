@@ -24,6 +24,9 @@
     imports: { keyPath: "id", autoIncrement: true },
     settings: { keyPath: "key" },
     mapping_profiles: { keyPath: "kaynak" },
+    // Kullanıcının "Yeni Excel Türü Ekle" ile tanımladığı özel kaynaklar.
+    custom_kaynaklar: { keyPath: "id" },
+    custom_veriler: { keyPath: "id" },
   };
 
   function dataKey(storeName) {
@@ -119,9 +122,11 @@
     },
   };
 
-  /** Tüm mağazaları temizler — "Tüm Verileri Sıfırla" için */
+  /** Tüm mağazaları temizler — "Tüm Verileri Sıfırla" için. Kaynak TANIMLARI
+      (mapping_profiles, custom_kaynaklar) kasıtlı olarak silinmez — yalnızca
+      içe aktarılmış VERİLER temizlenir. */
   function wipeAll() {
-    ["personel", "apron_kartlari", "egitim_kayitlari", "imports"].forEach((n) => writeStore(n, []));
+    ["personel", "apron_kartlari", "egitim_kayitlari", "imports", "custom_veriler"].forEach((n) => writeStore(n, []));
     return Promise.resolve();
   }
 

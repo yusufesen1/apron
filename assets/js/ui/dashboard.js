@@ -61,8 +61,8 @@
     return Array.from(files).join(", ");
   }
 
-  /** "Sütun Ekle" panelinde seçilebilecek, varsayılan tabloda gösterilmeyen ek sütunlar. */
-  const OPTIONAL_COLUMNS = [
+  /** "Sütun Ekle" panelinde seçilebilecek, varsayılan tabloda gösterilmeyen sabit ek sütunlar. */
+  const BUILTIN_OPTIONAL_COLUMNS = [
     { key: "opt_sicil", label: "Sicil", get: (r) => r.sicil || "—", sortVal: (r) => r.sicil || "" },
     { key: "opt_ahl_kartno", label: "AHL Kart No", get: (r) => kartAlan(r, "AHL", "kart_no") || "—", sortVal: (r) => kartAlan(r, "AHL", "kart_no") },
     { key: "opt_iga_kartno", label: "İGA Kart No", get: (r) => kartAlan(r, "IGA_AO", "kart_no") || "—", sortVal: (r) => kartAlan(r, "IGA_AO", "kart_no") },
@@ -83,8 +83,27 @@
     { key: "opt_kaynak_dosya", label: "Kaynak Dosya", get: (r) => kaynakDosyaValue(r) || "—", sortVal: (r) => kaynakDosyaValue(r) },
   ];
 
+  // Sabit sütunlar + o an tanımlı özel kaynakların sütunları — her render()'da yeniden kurulur.
+  let allOptionalColumns = BUILTIN_OPTIONAL_COLUMNS;
+
   function optionalColumnByKey(key) {
-    return OPTIONAL_COLUMNS.find((c) => c.key === key);
+    return allOptionalColumns.find((c) => c.key === key);
+  }
+
+  /** Özel kaynakların her alanı için bir OPTIONAL_COLUMNS girdisi üretir. */
+  function buildCustomColumns(customKaynaklar) {
+    const cols = [];
+    customKaynaklar.forEach((kaynak) => {
+      kaynak.alanlar.forEach((alan) => {
+        cols.push({
+          key: `cust_${kaynak.id}__${alan.key}`,
+          label: `${alan.etiket} (${kaynak.ad})`,
+          get: (r) => (r.custom[kaynak.id] && r.custom[kaynak.id][alan.key]) || "—",
+          sortVal: (r) => (r.custom[kaynak.id] && r.custom[kaynak.id][alan.key]) || "",
+        });
+      });
+    });
+    return cols;
   }
 
   async function render(root, isActive = () => true) {
@@ -138,10 +157,11 @@
       </div>
     `;
 
-    const [rows, settings] = await Promise.all([Model.buildPivotRows(), Model.getSettings()]);
+    const [rows, settings, customKaynaklar] = await Promise.all([Model.buildPivotRows(), Model.getSettings(), Model.getCustomKaynaklar()]);
     if (!isActive()) return; // kullanıcı bu sırada başka bir sekmeye geçti
     allRows = rows;
     currentSettings = settings;
+    allOptionalColumns = BUILTIN_OPTIONAL_COLUMNS.concat(buildCustomColumns(customKaynaklar));
     activeColumns = (settings.secili_sutunlar || []).filter((k) => optionalColumnByKey(k));
     setupFilterMultiselects(root);
     setupColumnPicker(root, isActive);
@@ -244,7 +264,7 @@
       },
     });
     qs(root, "#col-picker-mount").appendChild(columnsMs.el);
-    columnsMs.setOptions(OPTIONAL_COLUMNS.map((c) => ({ value: c.key, label: c.label })));
+    columnsMs.setOptions(allOptionalColumns.map((c) => ({ value: c.key, label: c.label })));
     columnsMs.setSelected(activeColumns);
   }
 

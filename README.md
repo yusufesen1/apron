@@ -157,6 +157,7 @@ Bu README ile birlikte, gerçek verilerin yapısını birebir yansıtan ama **ta
 - `IGA_AO_apron_sahte.xlsx`
 - `HEAS_apron_sahte.xlsx`
 - `PERSONEL_UNVAN_LISTESI_sahte.xlsx` (unvan/başkanlık kaynağı)
+- `ARAC_KARTI_LISTESI_sahte.xlsx` — "Yeni Excel Türü Ekle" sihirbazını denemek için örnek özel kaynak (TC Kimlik No, Plaka, Araç Modeli)
 
 Bazı kişiler kasıtlı olarak birden fazla dosyada (farklı havalimanlarında) tekrar ediyor — çoklu havalimanı senaryosunu test edebilmeniz için.
 
@@ -207,7 +208,7 @@ sample-data/                     Üretilen sahte Excel dosyaları
 | 8 | Manuel "Excel Yükle" butonları | Tamamlandı — otomatik senkronizasyon yok |
 | 9 | Taşeron "Bilgi" butonu | Tamamlandı — AHL: İşletme, İGA: Taşeron Firma; HEAŞ'ta alan yok, buton pasif |
 
-Ek olarak: "Excel'e Aktar" (konsolide görünümü dışa aktarma), isimlerin Türkçe kurallarına göre okunabilir biçime (İlk Harf Büyük) çevrilmesi, ve sekmeler arası hızlı geçişte oluşabilecek yarış durumlarına karşı koruma eklendi.
+Ek olarak (orijinal kapsamın ötesinde, kullanım sırasında eklenen): "Excel'e Aktar" (konsolide görünümü dışa aktarma), isimlerin Türkçe kurallarına göre okunabilir biçime (İlk Harf Büyük) çevrilmesi, sekmeler arası hızlı geçişte oluşabilecek yarış durumlarına karşı koruma, sütun bazlı sıralama, aranabilir/çoklu seçimli filtre menüleri, Genel Bakış tablosuna isteğe bağlı sütun ekleme ("Sütun Ekle", en fazla 5, kalıcı), Maliyet Tablosu paneli ve **"Yeni Excel Türü Ekle"** — sistemde tanımlı olmayan bir Excel'i (TC Kimlik No + istediğiniz sütunları eşleyerek) kalıcı bir kaynak olarak tanımlayabilme; sonradan Ayarlar > Özel Kaynaklar'dan düzenlenebilir/silinebilir, sütunları da "Sütun Ekle" panelinde belirir.
 
 ### 10.5 Açık soru #3 nasıl ele alındı
 

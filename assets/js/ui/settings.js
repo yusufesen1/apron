@@ -11,7 +11,11 @@
   const Mapping = global.Apron.mapping;
 
   async function render(root, isActive = () => true) {
-    const [profiles, settings] = await Promise.all([Model.getAllMappingProfiles(), Model.getSettings()]);
+    const [profiles, settings, customKaynaklar] = await Promise.all([
+      Model.getAllMappingProfiles(),
+      Model.getSettings(),
+      Model.getCustomKaynaklar(),
+    ]);
     if (!isActive()) return; // kullanıcı bu sırada başka bir sekmeye geçti
 
     root.innerHTML = `
@@ -95,6 +99,18 @@
           </div>
 
           <div class="card card--loose">
+            <h3 class="section-title">Özel Kaynaklar</h3>
+            <p class="card__meta" style="margin-bottom:16px">Excel Yükle sayfasındaki "Yeni Excel Türü Ekle" ile oluşturduğunuz kaynaklar. Sütun adlarını ya da ekrandaki etiketlerini buradan güncelleyebilir, kaynağı tamamen silebilirsiniz.</p>
+            <div class="stack" id="custom-kaynak-editors">
+              ${
+                customKaynaklar.length
+                  ? customKaynaklar.map((k) => customKaynakEditor(k)).join("")
+                  : `<p class="card__meta">Henüz özel kaynak eklenmedi.</p>`
+              }
+            </div>
+          </div>
+
+          <div class="card card--loose">
             <h3 class="section-title">Veri Yönetimi</h3>
             <p class="card__meta" style="margin-bottom:16px">Tüm içe aktarılan personel, kart ve eğitim kayıtlarını siler. Eşleştirme profilleri ve ayarlar etkilenmez. Bu işlem geri alınamaz.</p>
             <button type="button" class="btn" id="wipe-data" style="border-color:var(--red);color:var(--red)">${global.Apron.icon("trash", { size: 16, className: "btn__icon" })}Tüm Verileri Sıfırla</button>
@@ -103,7 +119,39 @@
       </div>
     `;
 
-    wire(root, settings);
+    wire(root, settings, customKaynaklar);
+  }
+
+  function customKaynakEditor(kaynak) {
+    return `
+      <details class="card" data-custom-kaynak="${kaynak.id}">
+        <summary style="cursor:pointer;font-weight:700;color:var(--ink)">${escapeHtml(kaynak.ad)}</summary>
+        <div class="stack stack--sm" style="margin-top:8px">
+          <div class="row" style="gap:12px">
+            <span style="min-width:220px;font-size:13px;color:var(--muted)">TC Kimlik No sütunu *</span>
+            <input class="input" style="flex:1" data-tc-sutun value="${escapeHtml(kaynak.tc_sutun)}" placeholder="Excel sütun başlığı" />
+          </div>
+          <div class="row" style="gap:12px">
+            <span style="min-width:220px;font-size:11px;color:var(--muted-2);text-transform:uppercase">Excel Sütunu</span>
+            <span style="flex:1;font-size:11px;color:var(--muted-2);text-transform:uppercase">Ekrandaki Etiket</span>
+          </div>
+          ${kaynak.alanlar
+            .map(
+              (a) => `
+            <div class="row" style="gap:12px">
+              <input class="input" style="min-width:220px;flex:1" data-field-excel="${escapeHtml(a.key)}" value="${escapeHtml(a.excel_sutun)}" placeholder="Excel sütun başlığı" />
+              <input class="input" style="flex:1" data-field-etiket="${escapeHtml(a.key)}" value="${escapeHtml(a.etiket)}" placeholder="Ekrandaki etiket" />
+            </div>
+          `
+            )
+            .join("")}
+        </div>
+        <div class="row" style="margin-top:16px;gap:8px">
+          <button type="button" class="btn btn--primary btn--sm" data-save-custom="${kaynak.id}">Değişiklikleri Kaydet</button>
+          <button type="button" class="btn btn--sm" data-delete-custom="${kaynak.id}" style="border-color:var(--red);color:var(--red)">Kaynağı Sil</button>
+        </div>
+      </details>
+    `;
   }
 
   function mappingEditor(profile) {
@@ -132,7 +180,7 @@
     `;
   }
 
-  function wire(root, settings) {
+  function wire(root, settings, customKaynaklar) {
     qs(root, "#save-egitim").addEventListener("click", async () => {
       const egitim_sureleri_varsayilan = {};
       Model.HAVALIMANLARI.forEach((h) => {
@@ -183,6 +231,38 @@
         const kaynak = btn.dataset.resetProfile;
         await Model.resetMappingProfile(kaynak);
         global.Apron.toast.show(`${Mapping.KAYNAKLAR[kaynak].etiket} eşlemesi varsayılana döndürüldü.`);
+        render(root);
+      });
+    });
+
+    qsa(root, "[data-save-custom]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const kaynakId = btn.dataset.saveCustom;
+        const details = qs(root, `[data-custom-kaynak="${kaynakId}"]`);
+        const kaynak = customKaynaklar.find((k) => k.id === kaynakId);
+        if (!kaynak) return;
+        const next = JSON.parse(JSON.stringify(kaynak));
+        const tcInput = qs(details, "[data-tc-sutun]");
+        if (tcInput) next.tc_sutun = tcInput.value.trim();
+        next.alanlar.forEach((a) => {
+          const excelInput = qs(details, `[data-field-excel="${a.key}"]`);
+          const etiketInput = qs(details, `[data-field-etiket="${a.key}"]`);
+          if (excelInput) a.excel_sutun = excelInput.value.trim();
+          if (etiketInput) a.etiket = etiketInput.value.trim() || a.etiket;
+        });
+        await Model.saveCustomKaynak(next);
+        global.Apron.toast.show(`"${next.ad}" güncellendi.`, { tone: "positive" });
+      });
+    });
+
+    qsa(root, "[data-delete-custom]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const kaynakId = btn.dataset.deleteCustom;
+        const kaynak = customKaynaklar.find((k) => k.id === kaynakId);
+        if (!kaynak) return;
+        if (!confirm(`"${kaynak.ad}" kaynağı ve içe aktarılmış tüm verisi silinecek. Bu işlem geri alınamaz. Emin misiniz?`)) return;
+        await Model.deleteCustomKaynak(kaynakId);
+        global.Apron.toast.show(`"${kaynak.ad}" silindi.`, { tone: "positive" });
         render(root);
       });
     });
