@@ -730,7 +730,7 @@ table.data tbody tr:last-child td { border-bottom: none; }
   color: var(--ink);
   background: var(--surface-2);
 }
-.multiselect__search input:focus-visible { border-color: var(--ink); }
+.multiselect__search input:focus-visible { border-color: var(--red); }
 .multiselect__actions { display: flex; gap: var(--sp-3); margin: 0 var(--sp-1) var(--sp-2); }
 .multiselect__actions button {
   appearance: none;
