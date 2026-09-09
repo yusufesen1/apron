@@ -91,20 +91,26 @@
       writeStore(storeName, items);
       return Promise.resolve(key);
     },
-    /** Toplu upsert */
+    /** Toplu upsert — tek okuma + tek yazma; O(n) (Map ile), değer sayısından
+        bağımsız olarak findIndex taraması YAPMAZ (bkz. import.js performans notu). */
     putMany(storeName, values) {
       const cfg = STORE_CONFIG[storeName];
-      const items = readStore(storeName);
+      const map = new Map(readStore(storeName).map((it) => [it[cfg.keyPath], it]));
       values.forEach((value) => {
         let key = value[cfg.keyPath];
         if ((key === undefined || key === null) && cfg.autoIncrement) {
           key = nextId(storeName);
-          value = Object.assign(value, { [cfg.keyPath]: key });
+          value = Object.assign({}, value, { [cfg.keyPath]: key });
         }
-        const idx = items.findIndex((it) => it[cfg.keyPath] === key);
-        if (idx >= 0) items[idx] = value;
-        else items.push(value);
+        map.set(key, value);
       });
+      writeStore(storeName, Array.from(map.values()));
+      return Promise.resolve();
+    },
+    /** Mağazanın tamamını doğrudan değiştirir (okuma/birleştirme yapmadan) —
+        çağıran taraf zaten TAM ve güncel içeriği elinde tutuyorsa (bkz.
+        model.js createImportBatch/persistImportBatch) kullanılır. */
+    setAll(storeName, items) {
       writeStore(storeName, items);
       return Promise.resolve();
     },

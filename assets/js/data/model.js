@@ -106,8 +106,43 @@
     await Store.delete("custom_kaynaklar", kaynakId);
   }
 
-  /** Bir özel kaynak satırını upsert eder — id = kaynak_id + tc_kimlik_no. */
-  async function upsertCustomVeri(kaynakId, tcKimlikNo, alanlar, kaynakDosya, importId) {
+  /**
+   * İçe aktarma (import) sırasında kullanılan bellek-içi toplu işlem bağlamı.
+   * Neden gerekli: Store.put satır başına TÜM mağazayı okuyup geri yazıyor;
+   * binlerce personelde bu O(n²) davranışa (her satırda tüm listeyi
+   * JSON.parse/stringify) yol açıp tarayıcı sekmesini dakikalarca kilitleyip
+   * "Bu sayfa yanıt vermiyor" uyarısına neden olabiliyordu. Bunun yerine ilgili
+   * mağazalar import başında TEK seferde belleğe alınır (bkz. createImportBatch),
+   * döngü boyunca yalnızca bellekteki Map'ler güncellenir, import sonunda TEK
+   * seferde geri yazılır (bkz. persistImportBatch).
+   */
+  async function createImportBatch() {
+    const [personelList, kartList, egitimList, customList] = await Promise.all([
+      Store.getAll("personel"),
+      Store.getAll("apron_kartlari"),
+      Store.getAll("egitim_kayitlari"),
+      Store.getAll("custom_veriler"),
+    ]);
+    return {
+      personel: new Map(personelList.map((p) => [p.tc_kimlik_no, p])),
+      apron_kartlari: new Map(kartList.map((k) => [k.id, k])),
+      egitim_kayitlari: new Map(egitimList.map((e) => [e.id, e])),
+      custom_veriler: new Map(customList.map((c) => [c.id, c])),
+    };
+  }
+
+  /** createImportBatch ile alınan bağlamı, güncellenmiş haliyle tek seferde geri yazar. */
+  async function persistImportBatch(batch) {
+    await Promise.all([
+      Store.setAll("personel", Array.from(batch.personel.values())),
+      Store.setAll("apron_kartlari", Array.from(batch.apron_kartlari.values())),
+      Store.setAll("egitim_kayitlari", Array.from(batch.egitim_kayitlari.values())),
+      Store.setAll("custom_veriler", Array.from(batch.custom_veriler.values())),
+    ]);
+  }
+
+  /** Bir özel kaynak satırını batch üzerinde upsert eder — id = kaynak_id + tc_kimlik_no. */
+  function upsertCustomVeri(batch, kaynakId, tcKimlikNo, alanlar, kaynakDosya, importId) {
     const id = `${kaynakId}__${tcKimlikNo}`;
     const kayit = {
       id,
@@ -118,7 +153,7 @@
       import_id: importId,
       guncelleme_tarihi: N.todayIso(),
     };
-    await Store.put("custom_veriler", kayit);
+    batch.custom_veriler.set(id, kayit);
     return kayit;
   }
 
@@ -133,8 +168,8 @@
    * apron kaynaklarından gelen isim/unvan/bölüm sadece o alan boşsa
    * ve mevcut kayıt yoksa kullanılır (fallback).
    */
-  async function upsertPersonelFromRow(row, kaynak, importId) {
-    const existing = (await Store.get("personel", row.tc_kimlik_no)) || {
+  function upsertPersonelFromRow(batch, row, kaynak, importId) {
+    const existing = batch.personel.get(row.tc_kimlik_no) || {
       tc_kimlik_no: row.tc_kimlik_no,
       sicil: "",
       ad: "",
@@ -171,14 +206,14 @@
     next.guncelleme_tarihi = N.todayIso();
     next.son_import_id = importId;
 
-    await Store.put("personel", next);
+    batch.personel.set(next.tc_kimlik_no, next);
     return next;
   }
 
-  /** Bir havalimanı apron kart kaydını upsert eder (tc_kimlik_no + havalimani anahtarlı). */
-  async function upsertApronKart(row, kaynak, importId) {
+  /** Bir havalimanı apron kart kaydını batch üzerinde upsert eder (tc_kimlik_no + havalimani anahtarlı). */
+  function upsertApronKart(batch, row, kaynak, importId) {
     const id = kartId(row.tc_kimlik_no, kaynak);
-    const existing = await Store.get("apron_kartlari", id);
+    const existing = batch.apron_kartlari.get(id);
 
     // Kart Durumu sütunu boşsa (bugün için AHL'de olduğu gibi, bkz. README §3.3)
     // kayıt Excel'de listeleniyorsa aktif kabul edilir. Ayarlar'dan bu kaynağa
@@ -204,17 +239,17 @@
       guncelleme_tarihi: N.todayIso(),
     };
 
-    await Store.put("apron_kartlari", kart);
+    batch.apron_kartlari.set(id, kart);
     return kart;
   }
 
   /**
-   * Güvenlik Bilinci Eğitimi kaydını upsert eder. Kaynak başına (İGA proxy,
-   * HEAŞ) tek güncel kayıt tutulur — id = tc_kimlik_no + kaynak.
+   * Güvenlik Bilinci Eğitimi kaydını batch üzerinde upsert eder. Kaynak başına
+   * (İGA proxy, HEAŞ) tek güncel kayıt tutulur — id = tc_kimlik_no + kaynak.
    * Bitiş tarihi: HEAŞ'ta kayda özel "Dönemi" varsa o kullanılır, yoksa
    * havalimanı için Ayarlar'daki varsayılan süre kullanılır.
    */
-  async function upsertEgitimKaydi(row, kaynak, importId, settings) {
+  function upsertEgitimKaydi(batch, row, kaynak, importId, settings) {
     if (!row.egitim_tarihi) return null;
 
     const id = `${row.tc_kimlik_no}__${kaynak}`;
@@ -234,7 +269,7 @@
       guncelleme_tarihi: N.todayIso(),
     };
 
-    await Store.put("egitim_kayitlari", kayit);
+    batch.egitim_kayitlari.set(id, kayit);
     return kayit;
   }
 
@@ -357,6 +392,8 @@
     resetMappingProfile,
     getExtraFieldSources,
     kartId,
+    createImportBatch,
+    persistImportBatch,
     upsertPersonelFromRow,
     upsertApronKart,
     upsertEgitimKaydi,

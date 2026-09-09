@@ -411,19 +411,19 @@
     const iga = rows.filter((r) => r.havalimani_var.IGA_AO).length;
     const heas = rows.filter((r) => r.havalimani_var.HEAS).length;
     const esikGun = currentSettings.uyari_esik_gun;
+    const filtreAktif = !!(filters.q || filters.baskanlik.length || filters.unvan.length || filters.havalimani || filters.egitimDurumu);
 
-    // Maliyet Tablosu her zaman şirket geneli — mevcut filtrelerden etkilenmez.
+    // Maliyet Tablosu, ana tablo ile aynı filtrelenmiş görünüme göre hesaplanır
+    // (örn. Unvan filtresi uygulanırsa yalnızca o unvana ait maliyet gösterilir).
     const m = currentSettings.maliyetler;
-    const ahlSayi = allRows.filter((r) => r.havalimani_var.AHL).length;
-    const igaSayi = allRows.filter((r) => r.havalimani_var.IGA_AO).length;
-    const heasSayi = allRows.filter((r) => r.havalimani_var.HEAS).length;
-    const gbsSayi = allRows.filter((r) => r.guncel_egitim).length;
-    const igaTutar = m.IGA_AO * igaSayi;
-    const ahlTutar = m.AHL * ahlSayi;
-    const heasTutar = m.HEAS * heasSayi;
+    const gbsSayi = rows.filter((r) => r.guncel_egitim).length;
+    const igaTutar = m.IGA_AO * iga;
+    const ahlTutar = m.AHL * ahl;
+    const heasTutar = m.HEAS * heas;
     const gbsTutar = m.GBS * gbsSayi;
     const kartTutarToplam = ahlTutar + igaTutar + heasTutar;
     const toplamGider = kartTutarToplam + gbsTutar;
+    const maliyetEtiket = `${filtreAktif ? "Filtrelenen" : "Tüm Şirket"} (${N.formatNumberTr(rows.length)} Personel)`;
 
     qs(root, "#dash-stats").innerHTML = `
       <div class="stat-panel">
@@ -455,19 +455,19 @@
       <div class="stat-panel stat-panel--full">
         <div class="stat-panel__head">
           <span class="stat-panel__label"><span class="stat-panel__dot"></span>Maliyet Tablosu</span>
-          <span class="stat-panel__tag">Tüm Şirket (${N.formatNumberTr(allRows.length)} Personel)</span>
+          <span class="stat-panel__tag">${maliyetEtiket}</span>
         </div>
         <div class="stat-panel__row stat-panel__row--cost">
-          ${costItem("AHL", ahlTutar, `${N.formatTL(m.AHL)} × ${N.formatNumberTr(ahlSayi)} Kart`, "blue")}
-          ${costItem("İGA", igaTutar, `${N.formatTL(m.IGA_AO)} × ${N.formatNumberTr(igaSayi)} Kart`, "teal")}
-          ${costItem("HEAŞ (SAW)", heasTutar, `${N.formatTL(m.HEAS)} (${m.HEAS_eur}€) × ${N.formatNumberTr(heasSayi)} Kart`, "neutral")}
+          ${costItem("AHL", ahlTutar, `${N.formatTL(m.AHL)} × ${N.formatNumberTr(ahl)} Kart`, "blue")}
+          ${costItem("İGA", igaTutar, `${N.formatTL(m.IGA_AO)} × ${N.formatNumberTr(iga)} Kart`, "teal")}
+          ${costItem("HEAŞ (SAW)", heasTutar, `${N.formatTL(m.HEAS)} (${m.HEAS_eur}€) × ${N.formatNumberTr(heas)} Kart`, "neutral")}
           <span class="stat-panel__divider"></span>
-          ${costItem("Kart Ücretleri Toplamı", kartTutarToplam, `${N.formatNumberTr(ahlSayi + igaSayi + heasSayi)} Kart · 3 Havalimanı`, "amber")}
+          ${costItem("Kart Ücretleri Toplamı", kartTutarToplam, `${N.formatNumberTr(ahl + iga + heas)} Kart · 3 Havalimanı`, "amber")}
           ${costItem("Sertifika Giderleri", gbsTutar, `${N.formatTL(m.GBS)} × ${N.formatNumberTr(gbsSayi)} Kart Sahibi`, "red")}
           <div class="stat-panel__total">
             <span class="stat-panel__item-label">Toplam Gider</span>
             <span class="stat-panel__total-value">${N.formatTL(toplamGider)}</span>
-            <span class="stat-panel__total-caption">${N.formatNumberTr(allRows.length)} Personel (Kart+GBS)</span>
+            <span class="stat-panel__total-caption">${N.formatNumberTr(rows.length)} Personel (Kart+GBS)</span>
           </div>
         </div>
       </div>

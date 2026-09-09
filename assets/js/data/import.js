@@ -112,6 +112,11 @@
     };
     const importId = await Store.put("imports", importRecordDraft);
 
+    // Tüm ilgili mağazalar TEK seferde belleğe alınır; döngü boyunca localStorage'a
+    // dokunulmaz (bkz. model.js createImportBatch — büyük dosyalarda tarayıcının
+    // kilitlenmesini/"yanıt vermiyor" uyarısını önlemek için).
+    const batch = await Model.createImportBatch();
+
     for (let i = 0; i < rows.length; i++) {
       const raw = rows[i];
       const isRowEmpty = Object.values(raw).every((v) => v === "" || v == null);
@@ -137,24 +142,26 @@
 
       out.__kaynak_dosya = file.name;
 
-      const existingKart = kaynak !== "PERSONEL" ? await Store.get("apron_kartlari", Model.kartId(out.tc_kimlik_no, kaynak)) : null;
-      const existingPersonel = await Store.get("personel", out.tc_kimlik_no);
+      const existingKart = kaynak !== "PERSONEL" ? batch.apron_kartlari.get(Model.kartId(out.tc_kimlik_no, kaynak)) : null;
+      const existingPersonel = batch.personel.get(out.tc_kimlik_no);
 
-      await Model.upsertPersonelFromRow(out, kaynak, importId);
+      Model.upsertPersonelFromRow(batch, out, kaynak, importId);
 
       if (kaynak !== "PERSONEL") {
-        await Model.upsertApronKart(out, kaynak, importId);
-        await Model.upsertEgitimKaydi(out, kaynak, importId, settings);
+        Model.upsertApronKart(batch, out, kaynak, importId);
+        Model.upsertEgitimKaydi(batch, out, kaynak, importId, settings);
       }
 
       if (out.__ek && Object.keys(out.__ek).length) {
-        await Model.upsertCustomVeri(kaynak, out.tc_kimlik_no, out.__ek, file.name, importId);
+        Model.upsertCustomVeri(batch, kaynak, out.tc_kimlik_no, out.__ek, file.name, importId);
       }
 
       const isNew = kaynak === "PERSONEL" ? !existingPersonel : !existingKart;
       if (isNew) eklenen++;
       else guncellenen++;
     }
+
+    await Model.persistImportBatch(batch);
 
     const importRecord = Object.assign({}, importRecordDraft, {
       id: importId,
@@ -195,6 +202,7 @@
       toplam_satir: rows.length,
     };
     const importId = await Store.put("imports", importRecordDraft);
+    const batch = await Model.createImportBatch();
 
     for (let i = 0; i < rows.length; i++) {
       const raw = rows[i];
@@ -219,11 +227,13 @@
         alanlar[alan.key] = key !== undefined ? N.cleanText(raw[key]) : "";
       });
 
-      const existing = await Store.get("custom_veriler", `${kaynakDef.id}__${tcKimlikNo}`);
-      await Model.upsertCustomVeri(kaynakDef.id, tcKimlikNo, alanlar, file.name, importId);
+      const existing = batch.custom_veriler.get(`${kaynakDef.id}__${tcKimlikNo}`);
+      Model.upsertCustomVeri(batch, kaynakDef.id, tcKimlikNo, alanlar, file.name, importId);
       if (existing) guncellenen++;
       else eklenen++;
     }
+
+    await Model.persistImportBatch(batch);
 
     const importRecord = Object.assign({}, importRecordDraft, { id: importId, eklenen, guncellenen, atlanan, hatalar });
     await Store.put("imports", importRecord);
