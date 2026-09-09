@@ -164,17 +164,15 @@ Bazı kişiler kasıtlı olarak birden fazla dosyada (farklı havalimanlarında)
 
 ### 10.1 Barındırma kararı
 
-Konuşulup netleşti: sistem **tamamen tarayıcı içinde, sunucusuz** çalışıyor. Hiçbir Excel/kişi verisi ağa çıkmaz; hepsi tarayıcının **IndexedDB**'sinde, yalnızca o bilgisayarda saklanır. SheetJS (Excel okuma/yazma) kütüphanesi de `assets/js/vendor/` altına gömülü — npm'deki eski/güvenlik açıklı sürüm yerine SheetJS'in resmi CDN'inden alınan güncel (0.20.3) sürüm kullanıldı, internet bağlantısı gerekmez.
+Konuşulup netleşti: sistem **tamamen tarayıcı içinde, sunucusuz** çalışıyor. Hiçbir Excel/kişi verisi ağa çıkmaz; hepsi tarayıcının **localStorage**'ında, yalnızca o bilgisayarda saklanır. SheetJS (Excel okuma/yazma) kütüphanesi de `assets/js/vendor/` altına gömülü — npm'deki eski/güvenlik açıklı sürüm yerine SheetJS'in resmi CDN'inden alınan güncel (0.20.3) sürüm kullanıldı, internet bağlantısı gerekmez.
 
 ### 10.2 Çalıştırma
 
-```
-npm start
-```
+`index.html` dosyasına çift tıklamanız yeterli — tarayıcıda doğrudan açılır, kurulum ya da sunucu gerekmez. (Önceki sürümde bir Node sunucusu vardı; IndexedDB `file://` altında bazı tarayıcılarda güvenilir çalışmadığı için gerekiyordu. Depolama katmanı localStorage'a geçirildi — o dosya://'da sorunsuz çalışıyor — ve sunucu tamamen kaldırıldı.)
 
-Bu, `scripts/serve.js`'i çalıştırır (bağımlılıksız, yalnızca Node'un kendi `http` modülünü kullanır), `http://127.0.0.1:5173/` adresinde dinler ve tarayıcıyı otomatik açar. Windows'ta `start.bat` dosyasına çift tıklamak da aynı işi yapar. `index.html` dosyasını doğrudan çift tıklayıp açmak da genelde çalışır, ancak IndexedDB bazı tarayıcılarda `file://` üzerinde kısıtlı davranabildiği için **`npm start` ile açmak önerilir**.
+Örnek (sahte) Excel dosyalarını yeniden üretmek isterseniz: `npm run generate-sample-data` → `sample-data/` klasörüne 4 dosya yazar (yalnızca bu adım Node gerektirir).
 
-Örnek (sahte) Excel dosyalarını yeniden üretmek isterseniz: `npm run generate-sample-data` → `sample-data/` klasörüne 4 dosya yazar.
+> **Not:** localStorage tarayıcı başına ~5-10 MB ile sınırlıdır (IndexedDB'den çok daha küçük). Birkaç bin personel + kart + eğitim kaydı için yeterlidir; çok daha büyük ölçekte (on binlerce kayıt) dolabilir — o noktada Ayarlar'daki "Tüm Verileri Sıfırla" ile temizlenip yeniden içe aktarılması ya da depolamanın tekrar IndexedDB'ye çevrilmesi gerekebilir.
 
 ### 10.3 Dosya yapısı
 
@@ -183,16 +181,15 @@ index.html                      Uygulama kabuğu
 assets/css/styles.css           TSS Dijital Tasarım Sistemi (bkz. §7)
 assets/js/vendor/                SheetJS (xlsx.full.min.js) — gömülü, offline
 assets/js/data/
-  db.js                          IndexedDB katmanı (personel, apron_kartlari,
+  db.js                          localStorage katmanı (personel, apron_kartlari,
                                  egitim_kayitlari, imports, settings, mapping_profiles)
   normalize.js                   Excel hücre temizleme (tarih, TC no, Türkçe metin)
   mapping-profiles.js             Kaynak başına varsayılan sütun eşlemeleri (§3.3)
   model.js                        İş kuralları: upsert, eğitim durumu, pivot üretimi
   import.js                       Excel okuma + mapping uygulama + modele yazma
-assets/js/ui/                    5 ekran (dashboard, import-view, alerts, history,
-                                 settings) + modal/toast/icon/util yardımcıları
-scripts/serve.js                 Bağımlılıksız yerel statik sunucu
-scripts/generate-sample-data.js  4 sahte örnek Excel'i üretir
+assets/js/ui/                    Ekranlar (dashboard, import-view, alerts, history,
+                                 settings) + modal/toast/icon/multiselect/util yardımcıları
+scripts/generate-sample-data.js  4 sahte örnek Excel'i üretir (yalnızca bunun için Node gerekir)
 sample-data/                     Üretilen sahte Excel dosyaları
 ```
 
@@ -218,6 +215,6 @@ Eğitim geçerlilik süresinin (3/5 yıl) hangi kritere göre atandığı hâlâ
 
 ### 10.6 Test durumu
 
-Uygulama, 4 örnek (sahte) Excel dosyasıyla uçtan uca otomatik olarak (Playwright ile) test edildi: içe aktarma, konsolide görünüm hesaplamaları (VAR/YOK, çoklu havalimanı sayısı, eğitim durumları), filtreleme, personel detay modalı, taşeron bilgi butonu, uyarılar, içe aktarma geçmişi, ayarlar ve sayfa yenilendikten sonra verinin kalıcı kalması (IndexedDB) doğrulandı. Konsol hatası yok.
+Uygulama, 4 örnek (sahte) Excel dosyasıyla uçtan uca otomatik olarak (Playwright ile) test edildi: içe aktarma, konsolide görünüm hesaplamaları (VAR/YOK, çoklu havalimanı sayısı, eğitim durumları), filtreleme, personel detay modalı, taşeron bilgi butonu, uyarılar, içe aktarma geçmişi, ayarlar ve sayfa yenilendikten sonra verinin kalıcı kalması (localStorage) doğrulandı. Konsol hatası yok.
 
 Sırada: Gerçek AHL/İGA/HEAŞ ve personel Excel dosyalarıyla deneme (sütun adları örnektekiyle birebir aynı değilse Ayarlar'dan eşleştirme güncellenir), açık soru #3'ün netleştirilmesi, ve talep gelirse lisanslı FF Mark font dosyalarının eklenmesi.

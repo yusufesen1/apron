@@ -1,128 +1,133 @@
 /* ============================================================
-   db.js — IndexedDB katmanı (sunucusuz, taşıyıcı-only mimari)
-   Tüm veri kullanıcının tarayıcısında kalır; hiçbir ağ isteği
-   yapılmaz. Bkz. README.md §4 (Hedef Veri Modeli).
+   db.js — localStorage tabanlı basit "veritabanı" katmanı.
+   index.html doğrudan çift tıklanıp (file://) açılabilsin diye
+   IndexedDB yerine localStorage kullanılıyor — IndexedDB bazı
+   tarayıcılarda file:// altında güvenilir çalışmıyor, localStorage
+   ise çalışıyor. Veri yine tamamen kullanıcının tarayıcısında
+   kalır, hiçbir ağ isteği yapılmaz (bkz. README.md §4).
+
+   API'si eskisiyle (IndexedDB sürümü) aynı — tüm işlemler Promise
+   döner — ki model.js/import.js hiç değişmeden çalışsın. Gerçekte
+   localStorage senkron olduğu için altyapı senkron çalışır, sadece
+   dışa Promise olarak sarılır.
    ============================================================ */
 (function (global) {
   "use strict";
 
-  const DB_NAME = "apron_takip_db";
-  const DB_VERSION = 1;
+  const PREFIX = "apron_takip:";
 
-  /** @type {IDBDatabase|null} */
-  let dbInstance = null;
+  // Her mağazanın birincil anahtar alanı (IndexedDB sürümündeki keyPath'lerle aynı).
+  const STORE_CONFIG = {
+    personel: { keyPath: "tc_kimlik_no" },
+    apron_kartlari: { keyPath: "id" },
+    egitim_kayitlari: { keyPath: "id" },
+    imports: { keyPath: "id", autoIncrement: true },
+    settings: { keyPath: "key" },
+    mapping_profiles: { keyPath: "kaynak" },
+  };
 
-  function openDb() {
-    if (dbInstance) return Promise.resolve(dbInstance);
-    return new Promise((resolve, reject) => {
-      const req = indexedDB.open(DB_NAME, DB_VERSION);
-
-      req.onupgradeneeded = (ev) => {
-        const db = req.result;
-
-        if (!db.objectStoreNames.contains("personel")) {
-          const store = db.createObjectStore("personel", { keyPath: "tc_kimlik_no" });
-          store.createIndex("sicil", "sicil", { unique: false });
-        }
-
-        if (!db.objectStoreNames.contains("apron_kartlari")) {
-          const store = db.createObjectStore("apron_kartlari", { keyPath: "id" });
-          store.createIndex("tc_kimlik_no", "tc_kimlik_no", { unique: false });
-          store.createIndex("havalimani", "havalimani", { unique: false });
-        }
-
-        if (!db.objectStoreNames.contains("egitim_kayitlari")) {
-          const store = db.createObjectStore("egitim_kayitlari", { keyPath: "id" });
-          store.createIndex("tc_kimlik_no", "tc_kimlik_no", { unique: false });
-        }
-
-        if (!db.objectStoreNames.contains("imports")) {
-          db.createObjectStore("imports", { keyPath: "id", autoIncrement: true });
-        }
-
-        if (!db.objectStoreNames.contains("settings")) {
-          db.createObjectStore("settings", { keyPath: "key" });
-        }
-
-        if (!db.objectStoreNames.contains("mapping_profiles")) {
-          db.createObjectStore("mapping_profiles", { keyPath: "kaynak" });
-        }
-      };
-
-      req.onsuccess = () => {
-        dbInstance = req.result;
-        resolve(dbInstance);
-      };
-      req.onerror = () => reject(req.error);
-      req.onblocked = () => reject(new Error("Veritabanı başka bir sekmede açık kaldığı için güncellenemedi."));
-    });
+  function dataKey(storeName) {
+    return PREFIX + storeName;
   }
 
-  function tx(storeNames, mode) {
-    return openDb().then((db) => db.transaction(storeNames, mode));
+  function readStore(storeName) {
+    try {
+      const raw = localStorage.getItem(dataKey(storeName));
+      return raw ? JSON.parse(raw) : [];
+    } catch (e) {
+      console.error("apron: localStorage okunamadı", storeName, e);
+      return [];
+    }
   }
 
-  function reqToPromise(req) {
-    return new Promise((resolve, reject) => {
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error);
-    });
+  function writeStore(storeName, items) {
+    try {
+      localStorage.setItem(dataKey(storeName), JSON.stringify(items));
+    } catch (e) {
+      throw new Error(
+        "Tarayıcı yerel depolama alanı dolu görünüyor, kayıt tamamlanamadı. " +
+          "Gereksiz verileri (örn. Ayarlar > Tüm Verileri Sıfırla) temizleyip tekrar deneyin."
+      );
+    }
+  }
+
+  function nextId(storeName) {
+    const counterKey = PREFIX + "counter:" + storeName;
+    const next = Number(localStorage.getItem(counterKey) || "0") + 1;
+    localStorage.setItem(counterKey, String(next));
+    return next;
   }
 
   const Store = {
     /** Tek kayıt oku */
     get(storeName, key) {
-      return tx(storeName, "readonly").then((t) => reqToPromise(t.objectStore(storeName).get(key)));
+      const cfg = STORE_CONFIG[storeName];
+      const found = readStore(storeName).find((it) => it[cfg.keyPath] === key);
+      return Promise.resolve(found);
     },
     /** Tüm kayıtları oku */
     getAll(storeName) {
-      return tx(storeName, "readonly").then((t) => reqToPromise(t.objectStore(storeName).getAll()));
+      return Promise.resolve(readStore(storeName));
     },
-    /** İndeks üzerinden oku */
+    /** Basit alan eşleşmesiyle oku (IndexedDB indeksinin yerini tutar) */
     getAllByIndex(storeName, indexName, value) {
-      return tx(storeName, "readonly").then((t) =>
-        reqToPromise(t.objectStore(storeName).index(indexName).getAll(value))
-      );
+      return Promise.resolve(readStore(storeName).filter((it) => it[indexName] === value));
     },
-    /** Ekle/güncelle (upsert) */
+    /** Ekle/güncelle (upsert) — anahtarı (autoIncrement ise otomatik üretilmiş halini) döner */
     put(storeName, value) {
-      return tx(storeName, "readwrite").then((t) => reqToPromise(t.objectStore(storeName).put(value)));
+      const cfg = STORE_CONFIG[storeName];
+      const items = readStore(storeName);
+      let key = value[cfg.keyPath];
+      if ((key === undefined || key === null) && cfg.autoIncrement) {
+        key = nextId(storeName);
+        value = Object.assign({}, value, { [cfg.keyPath]: key });
+      }
+      const idx = items.findIndex((it) => it[cfg.keyPath] === key);
+      if (idx >= 0) items[idx] = value;
+      else items.push(value);
+      writeStore(storeName, items);
+      return Promise.resolve(key);
     },
-    /** Toplu upsert — tek transaction */
+    /** Toplu upsert */
     putMany(storeName, values) {
-      return tx(storeName, "readwrite").then(
-        (t) =>
-          new Promise((resolve, reject) => {
-            const os = t.objectStore(storeName);
-            values.forEach((v) => os.put(v));
-            t.oncomplete = () => resolve();
-            t.onerror = () => reject(t.error);
-          })
-      );
+      const cfg = STORE_CONFIG[storeName];
+      const items = readStore(storeName);
+      values.forEach((value) => {
+        let key = value[cfg.keyPath];
+        if ((key === undefined || key === null) && cfg.autoIncrement) {
+          key = nextId(storeName);
+          value = Object.assign(value, { [cfg.keyPath]: key });
+        }
+        const idx = items.findIndex((it) => it[cfg.keyPath] === key);
+        if (idx >= 0) items[idx] = value;
+        else items.push(value);
+      });
+      writeStore(storeName, items);
+      return Promise.resolve();
     },
     delete(storeName, key) {
-      return tx(storeName, "readwrite").then((t) => reqToPromise(t.objectStore(storeName).delete(key)));
+      const cfg = STORE_CONFIG[storeName];
+      writeStore(storeName, readStore(storeName).filter((it) => it[cfg.keyPath] !== key));
+      return Promise.resolve();
     },
     clear(storeName) {
-      return tx(storeName, "readwrite").then((t) => reqToPromise(t.objectStore(storeName).clear()));
+      writeStore(storeName, []);
+      return Promise.resolve();
     },
     count(storeName) {
-      return tx(storeName, "readonly").then((t) => reqToPromise(t.objectStore(storeName).count()));
+      return Promise.resolve(readStore(storeName).length);
     },
   };
 
   /** Tüm mağazaları temizler — "Tüm Verileri Sıfırla" için */
   function wipeAll() {
-    return openDb().then(
-      (db) =>
-        new Promise((resolve, reject) => {
-          const names = ["personel", "apron_kartlari", "egitim_kayitlari", "imports"];
-          const t = db.transaction(names, "readwrite");
-          names.forEach((n) => t.objectStore(n).clear());
-          t.oncomplete = () => resolve();
-          t.onerror = () => reject(t.error);
-        })
-    );
+    ["personel", "apron_kartlari", "egitim_kayitlari", "imports"].forEach((n) => writeStore(n, []));
+    return Promise.resolve();
+  }
+
+  /** Geriye dönük uyumluluk için var; localStorage senkron olduğundan gerçek bir "açma" adımı yok. */
+  function openDb() {
+    return Promise.resolve(true);
   }
 
   global.Apron = global.Apron || {};
