@@ -1,0 +1,11 @@
+{
+  "name": "apron-kart-takip",
+  "version": "1.0.0",
+  "description": "Havalimanı apron kart takip sistemi (AHL, İGA, HEAŞ) — sunucusuz, tarayıcı içi çalışan dinamik arayüz.",
+  "private": true,
+  "scripts": {
+    "start": "node scripts/serve.js",
+    "generate-sample-data": "node scripts/generate-sample-data.js"
+  },
+  "license": "UNLICENSED"
+}
