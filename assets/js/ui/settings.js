@@ -65,6 +65,10 @@
                 <input class="input" id="maliyet-IGA_AO" type="number" min="0" step="1" value="${settings.maliyetler.IGA_AO}" />
               </div>
               <div class="field">
+                <label class="field__label" for="maliyet-IGA_TTAS">İGA TTAŞ Kart Ücreti (₺)</label>
+                <input class="input" id="maliyet-IGA_TTAS" type="number" min="0" step="1" value="${settings.maliyetler.IGA_TTAS}" />
+              </div>
+              <div class="field">
                 <label class="field__label" for="maliyet-HEAS">HEAŞ Kart Ücreti (₺)</label>
                 <input class="input" id="maliyet-HEAS" type="number" min="0" step="1" value="${settings.maliyetler.HEAS}" />
               </div>
@@ -160,7 +164,7 @@
       <details class="card" data-profile="${profile.kaynak}">
         <summary style="cursor:pointer;font-weight:700;color:var(--ink)">${escapeHtml(etiket)}</summary>
         <p class="card__meta" style="margin:8px 0 16px">${escapeHtml(profile.aciklama)}</p>
-        <div class="stack stack--sm">
+        <div class="stack stack--sm" data-ek-list="${profile.kaynak}">
           ${profile.alanlar
             .map(
               (a) => `
@@ -171,31 +175,29 @@
           `
             )
             .join("")}
-        </div>
-
-        <div class="row row--between" style="margin-top:20px;margin-bottom:8px">
-          <span style="font-size:11px;color:var(--muted-2);text-transform:uppercase">Ek Sütunlar (opsiyonel)</span>
-          <button type="button" class="btn btn--sm" data-add-ek="${profile.kaynak}">+ Sütun Ekle</button>
-        </div>
-        <p class="card__meta" style="margin-bottom:12px">Excel'e sonradan eklenen, sistemde henüz karşılığı olmayan sütunları burada tanımlayın. T.C. Kimlik No üzerinden kişiye bağlanır, Genel Bakış'taki "Sütun Ekle" panelinde görünür.</p>
-        <div class="stack stack--sm" data-ek-list="${profile.kaynak}">
           ${(profile.ek_alanlar || []).map(ekRowHtml).join("")}
         </div>
 
         <div class="row" style="margin-top:16px;gap:8px">
           <button type="button" class="btn btn--primary btn--sm" data-save-profile="${profile.kaynak}">Eşlemeyi Kaydet</button>
           <button type="button" class="btn btn--sm" data-reset-profile="${profile.kaynak}">Varsayılana Döndür</button>
+          <span class="spacer"></span>
+          <button type="button" class="btn btn--ghost btn--sm" data-add-ek="${profile.kaynak}">+ Sütun Ekle</button>
         </div>
       </details>
     `;
   }
 
+  /** Ek sütun satırı — sabit alan satırlarıyla AYNI görünümde (etiket solda düz
+      metin gibi, tek input sağda); "opsiyonel" diye ayrı bir bölüm göstermez.
+      Etiket yine de düzenlenebilir (ghost input), silme düğmesi satır üstüne
+      gelince belirir. */
   function ekRowHtml(a) {
     return `
       <div class="row ek-row" style="gap:12px" data-ek-key="${escapeHtml(a.key || "")}">
-        <input class="input" style="min-width:220px;flex:1" data-ek-excel value="${escapeHtml(a.excel_sutun || "")}" placeholder="Excel sütun başlığı" />
-        <input class="input" style="flex:1" data-ek-etiket value="${escapeHtml(a.etiket || "")}" placeholder="Ekrandaki etiket" />
-        <button type="button" class="btn btn--sm" data-remove-ek title="Sütunu kaldır">${global.Apron.icon("close", { size: 12 })}</button>
+        <input class="input input--ghost" style="min-width:220px" data-ek-etiket value="${escapeHtml(a.etiket || "")}" placeholder="Alan adı" />
+        <input class="input" style="flex:1" data-ek-excel value="${escapeHtml(a.excel_sutun || "")}" placeholder="Excel sütun başlığı" />
+        <button type="button" class="ek-row__remove" data-remove-ek title="Sütunu kaldır">${global.Apron.icon("close", { size: 12 })}</button>
       </div>
     `;
   }
@@ -217,6 +219,7 @@
         ...guncel,
         AHL: Number(qs(root, "#maliyet-AHL").value) || 0,
         IGA_AO: Number(qs(root, "#maliyet-IGA_AO").value) || 0,
+        IGA_TTAS: Number(qs(root, "#maliyet-IGA_TTAS").value) || 0,
         HEAS: Number(qs(root, "#maliyet-HEAS").value) || 0,
         HEAS_eur: Number(qs(root, "#maliyet-HEAS_eur").value) || 0,
       };

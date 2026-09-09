@@ -7,7 +7,9 @@
   const TABS = [
     { id: "dashboard", label: "Genel Bakış", render: (isActive) => global.Apron.dashboard.render(viewRoot(), isActive) },
     { id: "import", label: "Excel Yükle", render: (isActive) => global.Apron.importView.render(viewRoot(), isActive) },
-    { id: "alerts", label: "Eğitim Takibi", render: (isActive) => global.Apron.alerts.render(viewRoot(), isActive) },
+    // "alerts" (Eğitim Takibi) sekmesi kullanıcı isteğiyle header'dan kaldırıldı —
+    // alerts.js dosyası duruyor, geri eklemek için bu satır + index.html'deki
+    // <script> etiketi yeniden açılabilir.
     { id: "history", label: "İçe Aktarma Geçmişi", render: (isActive) => global.Apron.history.render(viewRoot(), isActive) },
     { id: "settings", label: "Ayarlar", render: (isActive) => global.Apron.settings.render(viewRoot(), isActive) },
   ];

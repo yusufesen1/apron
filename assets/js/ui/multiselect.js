@@ -8,6 +8,10 @@
    - multiple:false → Havalimanı/Eğitim Durumu gibi kısa, tekli
      seçim listeleri: arama kutusu yok, bir seçenek tıklanınca
      panel kapanır.
+   triggerIcon:"filter" → tablo başlıklarındaki huni (sadece ikon,
+   metinsiz) tetikleyici; bileşen içindeki hiçbir tıklama (tetikleyici,
+   panel içi seçenekler) sarmalayan öğeye (örn. sıralama tıklaması)
+   sızmaz — bkz. wrap'e eklenen genel stopPropagation.
    ============================================================ */
 (function (global) {
   "use strict";
@@ -40,7 +44,7 @@
    * @param {string} [opts.searchPlaceholder]
    * @param {string} [opts.triggerId]
    * @param {string} [opts.triggerClassName] Verilirse tetikleyicinin görünümü ("input" yerine) bu sınıfları kullanır — örn. bir düğme gibi görünmesi için "btn btn--sm".
-   * @param {"chevron"|"plus"} [opts.triggerIcon]
+   * @param {"chevron"|"plus"|"filter"} [opts.triggerIcon] "filter" ikon-yalnızca (metinsiz) bir huni düğmesi üretir.
    * @param {boolean} [opts.staticLabel] true ise tetikleyici metni hep placeholder'da kalır (bir "ekle" düğmesi gibi davranır).
    * @param {boolean} [opts.multiple] false ise tekli seçim, arama kutusu ve toplu eylemler gizlenir.
    * @param {number} [opts.maxSelected] multiple:true iken en fazla kaç seçenek işaretlenebileceği.
@@ -66,6 +70,8 @@
     const triggerInner =
       triggerIcon === "plus"
         ? `${icon("plus", { size: 14, className: "btn__icon" })}<span class="multiselect__trigger-text">${escapeHtml(placeholder)}</span>`
+        : triggerIcon === "filter"
+        ? icon("filter", { size: 13, className: "multiselect__trigger-filter-icon" })
         : `<span class="multiselect__trigger-text">${escapeHtml(placeholder)}</span>${icon("chevron", { size: 14, className: "multiselect__trigger-icon" })}`;
 
     const wrap = document.createElement("div");
@@ -92,6 +98,11 @@
         ${maxSelected ? `<p class="multiselect__hint" hidden>En fazla ${maxSelected} sütun eklenebilir.</p>` : ""}
       </div>
     `;
+
+    // Bileşen kendi içindeki HİÇBİR tıklamanın (tetikleyici, arama kutusu,
+    // seçenek, panel içi eylem düğmeleri) sarmalayan bir öğeye (örn. tablo
+    // başlığının sıralama tıklaması) sızmasını istemeyiz — tek noktadan engelle.
+    wrap.addEventListener("click", (e) => e.stopPropagation());
 
     const trigger = qs(wrap, ".multiselect__trigger");
     const triggerText = qs(wrap, ".multiselect__trigger-text");
@@ -161,10 +172,13 @@
     }
 
     function updateTrigger() {
-      if (staticLabel) triggerText.textContent = placeholder;
-      else if (selected.size === 0) triggerText.textContent = placeholder;
-      else if (selected.size === 1) triggerText.textContent = labelFor(Array.from(selected)[0]);
-      else triggerText.textContent = `${selected.size} seçili`;
+      // triggerIcon:"filter" modunda görünür metin yok (yalnızca huni ikonu).
+      if (triggerText) {
+        if (staticLabel) triggerText.textContent = placeholder;
+        else if (selected.size === 0) triggerText.textContent = placeholder;
+        else if (selected.size === 1) triggerText.textContent = labelFor(Array.from(selected)[0]);
+        else triggerText.textContent = `${selected.size} seçili`;
+      }
       trigger.classList.toggle("is-active", selected.size > 0 && !selected.has(""));
     }
 

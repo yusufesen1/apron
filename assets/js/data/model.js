@@ -10,8 +10,8 @@
   const { Store } = global.Apron.DB;
   const N = global.Apron.normalize;
 
-  const HAVALIMANLARI = ["AHL", "IGA_AO", "HEAS"];
-  const HAVALIMANI_ETIKET = { AHL: "AHL", IGA_AO: "İGA", HEAS: "HEAŞ" };
+  const HAVALIMANLARI = ["AHL", "IGA_AO", "IGA_TTAS", "HEAS"];
+  const HAVALIMANI_ETIKET = { AHL: "AHL", IGA_AO: "İGA", IGA_TTAS: "İGA TTAŞ", HEAS: "HEAŞ" };
 
   const DEFAULT_SETTINGS = {
     key: "genel",
@@ -19,12 +19,12 @@
     // kayıt bazlı kullanılır. AHL ve İGA'da bu bilgi olmadığından, burada
     // havalimanı bazlı bir VARSAYILAN tanımlanır — Ayarlar ekranından
     // değiştirilebilir. Netleşene kadar geçici bir karardır.
-    egitim_sureleri_varsayilan: { AHL: 5, IGA_AO: 5, HEAS: 5 },
+    egitim_sureleri_varsayilan: { AHL: 5, IGA_AO: 5, IGA_TTAS: 5, HEAS: 5 },
     uyari_esik_gun: 60,
     // Kart/sertifika birim maliyetleri (₺) — Maliyet Tablosu panelinde kullanılır.
     // Başlangıç değerleri örnek/yer tutucudur, Ayarlar > Maliyet Ayarları'ndan
     // gerçek rakamlarla güncellenebilir.
-    maliyetler: { AHL: 2000, IGA_AO: 2000, HEAS: 2800, HEAS_eur: 50, GBS: 700 },
+    maliyetler: { AHL: 2000, IGA_AO: 2000, IGA_TTAS: 2000, HEAS: 2800, HEAS_eur: 50, GBS: 700 },
     // Genel Bakış tablosuna "Sütun Ekle" ile eklenen isteğe bağlı sütunlar
     // (anahtar listesi, eklenme sırasıyla — soldan sağa böyle dizilir).
     secili_sutunlar: [],
@@ -330,8 +330,11 @@
       kendiOzelVeri.forEach((v) => (ozel[v.kaynak_id] = v.alanlar));
 
       const kartByHavalimani = {};
+      const havalimaniVar = {};
       HAVALIMANLARI.forEach((h) => {
-        kartByHavalimani[h] = kendiKartlari.find((k) => k.havalimani === h) || null;
+        const kart = kendiKartlari.find((k) => k.havalimani === h) || null;
+        kartByHavalimani[h] = kart;
+        havalimaniVar[h] = !!(kart && kart.aktif);
       });
 
       // Ad/soyad ve unvan/başkanlık için fallback: personel yoksa apron kartlarından türet.
@@ -349,11 +352,7 @@
         baskanlik: (p && p.baskanlik) || "",
         personel_kaydi_var: !!p,
         kartlar: kartByHavalimani,
-        havalimani_var: {
-          AHL: !!(kartByHavalimani.AHL && kartByHavalimani.AHL.aktif),
-          IGA_AO: !!(kartByHavalimani.IGA_AO && kartByHavalimani.IGA_AO.aktif),
-          HEAS: !!(kartByHavalimani.HEAS && kartByHavalimani.HEAS.aktif),
-        },
+        havalimani_var: havalimaniVar,
         egitim_kayitlari: kendiEgitimleri,
         guncel_egitim: guncelEgitim,
         egitim_durumu: egitimDurumu(guncelEgitim, settings.uyari_esik_gun),

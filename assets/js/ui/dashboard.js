@@ -1,6 +1,6 @@
 /* ============================================================
    dashboard.js — Genel Bakış (README §3.1 "LAZIM OLAN").
-   TC KİMLİK NO | AD SOYAD | UNVAN | BAŞKANLIK | AHL | İGA | HEAŞ | GÜV. BİL. SER.
+   TC KİMLİK NO | AD SOYAD | UNVAN | BAŞKANLIK | AHL | İGA | İGA TTAŞ | HEAŞ | GÜV. BİL. SER.
    ============================================================ */
 (function (global) {
   "use strict";
@@ -12,12 +12,18 @@
 
   let allRows = [];
   let currentSettings = Model.DEFAULT_SETTINGS;
-  let filters = { q: "", baskanlik: [], unvan: [], havalimani: "", egitimDurumu: "" };
-  // Her render()'da yeniden kurulan özel açılır menü bileşenleri.
-  let baskanlikMs = null;
-  let unvanMs = null;
-  let havalimaniMs = null;
-  let egitimMs = null;
+
+  /** Havalimanı başına "" | "VAR" | "YOK" tutan varsayılan filtre nesnesi üretir. */
+  function defaultFilters() {
+    const havalimaniDurum = {};
+    Model.HAVALIMANLARI.forEach((h) => (havalimaniDurum[h] = ""));
+    return { q: "", baskanlik: [], unvan: [], havalimaniDurum, egitimDurumu: "" };
+  }
+
+  let filters = defaultFilters();
+  // Sütun başlıklarındaki huni filtreleri — her thead yeniden kurulduğunda
+  // (renderTableHead) yeniden oluşturulur, anahtar = FILTERABLE_COLUMNS anahtarı.
+  let columnFilterMs = {};
   let columnsMs = null;
   // Sekmeler arası geçişte de hatırlansın diye modül seviyesinde tutuluyor.
   let sortState = { key: null, dir: "asc" };
@@ -28,12 +34,13 @@
   const SORT_COLUMNS = [
     { key: "tc_kimlik_no", label: "TC Kimlik No" },
     { key: "ad_soyad", label: "Ad Soyad" },
-    { key: "unvan", label: "Unvan" },
-    { key: "baskanlik", label: "Başkanlık" },
-    { key: "AHL", label: "AHL" },
-    { key: "IGA_AO", label: "İGA" },
-    { key: "HEAS", label: "HEAŞ" },
-    { key: "egitim", label: "Güv. Bil. Eğitimi" },
+    { key: "unvan", label: "Unvan", filter: "unvan" },
+    { key: "baskanlik", label: "Başkanlık", filter: "baskanlik", filterAlign: "left" },
+    { key: "AHL", label: "AHL", filter: "AHL", filterAlign: "right" },
+    { key: "IGA_AO", label: "İGA", filter: "IGA_AO", filterAlign: "right" },
+    { key: "IGA_TTAS", label: "İGA TTAŞ", filter: "IGA_TTAS", filterAlign: "right" },
+    { key: "HEAS", label: "HEAŞ", filter: "HEAS", filterAlign: "right" },
+    { key: "egitim", label: "Güv. Bil. Eğitimi", filter: "egitim", filterAlign: "right" },
     { key: "egitim", label: "Tarih" },
   ];
 
@@ -49,7 +56,7 @@
   }
 
   function taseronValue(r) {
-    return kartAlan(r, "AHL", "taseron_firma") || kartAlan(r, "IGA_AO", "taseron_firma");
+    return kartAlan(r, "AHL", "taseron_firma") || kartAlan(r, "IGA_AO", "taseron_firma") || kartAlan(r, "IGA_TTAS", "taseron_firma");
   }
 
   function kaynakDosyaValue(r) {
@@ -66,12 +73,15 @@
     { key: "opt_sicil", label: "Sicil", get: (r) => r.sicil || "—", sortVal: (r) => r.sicil || "" },
     { key: "opt_ahl_kartno", label: "AHL Kart No", get: (r) => kartAlan(r, "AHL", "kart_no") || "—", sortVal: (r) => kartAlan(r, "AHL", "kart_no") },
     { key: "opt_iga_kartno", label: "İGA Kart No", get: (r) => kartAlan(r, "IGA_AO", "kart_no") || "—", sortVal: (r) => kartAlan(r, "IGA_AO", "kart_no") },
+    { key: "opt_igattas_kartno", label: "İGA TTAŞ Kart No", get: (r) => kartAlan(r, "IGA_TTAS", "kart_no") || "—", sortVal: (r) => kartAlan(r, "IGA_TTAS", "kart_no") },
     { key: "opt_heas_kartno", label: "HEAŞ Kart No", get: (r) => kartAlan(r, "HEAS", "kart_no") || "—", sortVal: (r) => kartAlan(r, "HEAS", "kart_no") },
     { key: "opt_ahl_baslangic", label: "AHL Kart Başlangıç", get: (r) => tarihGoster(kartAlan(r, "AHL", "baslangic_tarihi")), sortVal: (r) => kartAlan(r, "AHL", "baslangic_tarihi") },
     { key: "opt_iga_baslangic", label: "İGA Kart Başlangıç", get: (r) => tarihGoster(kartAlan(r, "IGA_AO", "baslangic_tarihi")), sortVal: (r) => kartAlan(r, "IGA_AO", "baslangic_tarihi") },
+    { key: "opt_igattas_baslangic", label: "İGA TTAŞ Kart Başlangıç", get: (r) => tarihGoster(kartAlan(r, "IGA_TTAS", "baslangic_tarihi")), sortVal: (r) => kartAlan(r, "IGA_TTAS", "baslangic_tarihi") },
     { key: "opt_heas_baslangic", label: "HEAŞ Kart Başlangıç", get: (r) => tarihGoster(kartAlan(r, "HEAS", "baslangic_tarihi")), sortVal: (r) => kartAlan(r, "HEAS", "baslangic_tarihi") },
     { key: "opt_ahl_bitis", label: "AHL Kart Bitiş", get: (r) => tarihGoster(kartAlan(r, "AHL", "bitis_tarihi")), sortVal: (r) => kartAlan(r, "AHL", "bitis_tarihi") },
     { key: "opt_iga_bitis", label: "İGA Kart Bitiş", get: (r) => tarihGoster(kartAlan(r, "IGA_AO", "bitis_tarihi")), sortVal: (r) => kartAlan(r, "IGA_AO", "bitis_tarihi") },
+    { key: "opt_igattas_bitis", label: "İGA TTAŞ Kart Bitiş", get: (r) => tarihGoster(kartAlan(r, "IGA_TTAS", "bitis_tarihi")), sortVal: (r) => kartAlan(r, "IGA_TTAS", "bitis_tarihi") },
     { key: "opt_heas_bitis", label: "HEAŞ Kart Bitiş", get: (r) => tarihGoster(kartAlan(r, "HEAS", "bitis_tarihi")), sortVal: (r) => kartAlan(r, "HEAS", "bitis_tarihi") },
     { key: "opt_taseron", label: "Taşeron Firma", get: (r) => taseronValue(r) || "—", sortVal: (r) => taseronValue(r) },
     {
@@ -119,27 +129,13 @@
               <input class="input" id="f-q" type="text" placeholder="TC Kimlik No veya Ad Soyad" />
             </div>
           </div>
-          <div class="field">
-            <label class="field__label" for="f-unvan">Unvan</label>
-            <div id="f-unvan-mount"></div>
-          </div>
-          <div class="field">
-            <label class="field__label" for="f-baskanlik">Başkanlık</label>
-            <div id="f-baskanlik-mount"></div>
-          </div>
-          <div class="field">
-            <label class="field__label" for="f-havalimani">Havalimanı</label>
-            <div id="f-havalimani-mount"></div>
-          </div>
-          <div class="field">
-            <label class="field__label" for="f-egitim">Eğitim Durumu</label>
-            <div id="f-egitim-mount"></div>
-          </div>
-          <button type="button" class="btn btn--ghost btn--sm" id="f-clear">Temizle</button>
         </div>
 
         <div class="table-toolbar">
-          <span class="table-toolbar__count" id="dash-count"></span>
+          <div class="row" style="gap:12px">
+            <span class="table-toolbar__count" id="dash-count"></span>
+            <button type="button" class="btn btn--ghost btn--sm" id="f-clear" hidden>Filtreleri Temizle</button>
+          </div>
           <div class="row" style="gap:8px">
             <div id="col-picker-mount"></div>
             <button type="button" class="btn btn--sm" id="dash-export">${icon("download", { size: 14, className: "btn__icon" })}Excel'e Aktar</button>
@@ -163,7 +159,6 @@
     currentSettings = settings;
     allOptionalColumns = BUILTIN_OPTIONAL_COLUMNS.concat(buildCustomColumns(extraFieldSources));
     activeColumns = (settings.secili_sutunlar || []).filter((k) => optionalColumnByKey(k));
-    setupFilterMultiselects(root);
     setupColumnPicker(root, isActive);
     wireFilters(root, isActive);
     renderTableHead(root, isActive);
@@ -175,74 +170,93 @@
     return Array.from(new Set(allRows.map((r) => r[field]).filter(Boolean))).sort((a, b) => a.localeCompare(b, "tr"));
   }
 
-  function setupFilterMultiselects(root) {
+  /** Sütun başlığındaki huniye tıklayınca açılan, o sütuna özel filtre menüsünü kurar. */
+  function setupColumnFilters(root, isActive) {
     const refresh = () => {
+      if (!isActive()) return;
       renderStats(root);
       renderTable(root);
     };
 
-    baskanlikMs = global.Apron.multiselect.create({
-      placeholder: "Tümü",
-      searchPlaceholder: "Başkanlık ara…",
-      triggerId: "f-baskanlik",
-      onChange: (values) => {
-        filters.baskanlik = values;
-        refresh();
-      },
-    });
-    qs(root, "#f-baskanlik-mount").appendChild(baskanlikMs.el);
-    baskanlikMs.setOptions(distinctValues("baskanlik"));
-    baskanlikMs.setSelected(filters.baskanlik);
+    columnFilterMs = {};
 
-    unvanMs = global.Apron.multiselect.create({
-      placeholder: "Tümü",
-      searchPlaceholder: "Unvan ara…",
-      triggerId: "f-unvan",
-      onChange: (values) => {
-        filters.unvan = values;
-        refresh();
-      },
-    });
-    qs(root, "#f-unvan-mount").appendChild(unvanMs.el);
-    unvanMs.setOptions(distinctValues("unvan"));
-    unvanMs.setSelected(filters.unvan);
+    qsa(root, "[data-filter-mount]").forEach((mount) => {
+      const key = mount.dataset.filterMount;
+      const align = mount.dataset.filterAlign || "left";
+      let ms;
 
-    havalimaniMs = global.Apron.multiselect.create({
-      placeholder: "Tümü",
-      triggerId: "f-havalimani",
-      multiple: false,
-      onChange: (value) => {
-        filters.havalimani = value;
-        refresh();
-      },
-    });
-    qs(root, "#f-havalimani-mount").appendChild(havalimaniMs.el);
-    havalimaniMs.setOptions([
-      { value: "", label: "Tümü" },
-      { value: "AHL", label: "AHL" },
-      { value: "IGA_AO", label: "İGA" },
-      { value: "HEAS", label: "HEAŞ" },
-    ]);
-    havalimaniMs.setSelected(filters.havalimani);
+      if (key === "unvan" || key === "baskanlik") {
+        ms = global.Apron.multiselect.create({
+          triggerIcon: "filter",
+          triggerClassName: "th-filter-trigger",
+          searchPlaceholder: key === "unvan" ? "Unvan ara…" : "Başkanlık ara…",
+          multiple: true,
+          panelAlign: align,
+          onChange: (values) => {
+            filters[key] = values;
+            refresh();
+          },
+        });
+        ms.setOptions(distinctValues(key));
+        ms.setSelected(filters[key]);
+      } else if (key === "egitim") {
+        ms = global.Apron.multiselect.create({
+          triggerIcon: "filter",
+          triggerClassName: "th-filter-trigger",
+          multiple: false,
+          panelAlign: align,
+          onChange: (value) => {
+            filters.egitimDurumu = value;
+            refresh();
+          },
+        });
+        ms.setOptions([
+          { value: "", label: "Tümü" },
+          { value: "Aktif", label: "Aktif" },
+          { value: "Yaklaşıyor", label: "Yaklaşıyor" },
+          { value: "Süresi Dolmuş", label: "Süresi Dolmuş" },
+          { value: "Bilgi Yok", label: "Bilgi Yok" },
+        ]);
+        ms.setSelected(filters.egitimDurumu);
+      } else if (Model.HAVALIMANLARI.includes(key)) {
+        ms = global.Apron.multiselect.create({
+          triggerIcon: "filter",
+          triggerClassName: "th-filter-trigger",
+          multiple: false,
+          panelAlign: align,
+          onChange: (value) => {
+            filters.havalimaniDurum[key] = value;
+            refresh();
+          },
+        });
+        ms.setOptions([
+          { value: "", label: "Tümü" },
+          { value: "VAR", label: "VAR" },
+          { value: "YOK", label: "YOK" },
+        ]);
+        ms.setSelected(filters.havalimaniDurum[key]);
+      }
 
-    egitimMs = global.Apron.multiselect.create({
-      placeholder: "Tümü",
-      triggerId: "f-egitim",
-      multiple: false,
-      onChange: (value) => {
-        filters.egitimDurumu = value;
-        refresh();
-      },
+      if (ms) {
+        mount.appendChild(ms.el);
+        columnFilterMs[key] = ms;
+      }
     });
-    qs(root, "#f-egitim-mount").appendChild(egitimMs.el);
-    egitimMs.setOptions([
-      { value: "", label: "Tümü" },
-      { value: "Aktif", label: "Aktif" },
-      { value: "Yaklaşıyor", label: "Yaklaşıyor" },
-      { value: "Süresi Dolmuş", label: "Süresi Dolmuş" },
-      { value: "Bilgi Yok", label: "Bilgi Yok" },
-    ]);
-    egitimMs.setSelected(filters.egitimDurumu);
+  }
+
+  function anyFilterActive() {
+    return !!(
+      filters.q ||
+      filters.baskanlik.length ||
+      filters.unvan.length ||
+      filters.egitimDurumu ||
+      Object.values(filters.havalimaniDurum).some(Boolean)
+    );
+  }
+
+  function updateClearFiltersVisibility(root) {
+    const btn = qs(root, "#f-clear");
+    if (btn) btn.hidden = !anyFilterActive();
   }
 
   function setupColumnPicker(root, isActive) {
@@ -291,13 +305,11 @@
       }, 180)
     );
     qs(root, "#f-clear").addEventListener("click", () => {
-      filters = { q: "", baskanlik: [], unvan: [], havalimani: "", egitimDurumu: "" };
+      filters = defaultFilters();
       qs(root, "#f-q").value = "";
-      baskanlikMs.clear();
-      unvanMs.clear();
-      havalimaniMs.clear();
-      egitimMs.clear();
+      Object.values(columnFilterMs).forEach((ms) => ms.clear());
       refresh();
+      updateClearFiltersVisibility(root);
     });
     qs(root, "#dash-export").addEventListener("click", () => exportCurrentView(root));
   }
@@ -308,6 +320,7 @@
         <span class="th-sortable__inner">
           ${escapeHtml(col.label)}
           <span class="th-sortable__icon"></span>
+          ${col.filter ? `<span class="th-filter-mount" data-filter-mount="${col.filter}" data-filter-align="${col.filterAlign || "left"}"></span>` : ""}
           ${removable ? `<button type="button" class="th-remove" data-remove-col="${col.key}" title="Sütunu kaldır">${icon("close", { size: 11 })}</button>` : ""}
         </span>
       </th>
@@ -320,6 +333,7 @@
     qs(root, "#dash-thead-row").innerHTML =
       SORT_COLUMNS.map((c) => sortableTh(c)).join("") + optCols.map((c) => sortableTh(c, true)).join("");
     wireSorting(root, isActive);
+    setupColumnFilters(root, isActive);
   }
 
   function wireSorting(root, isActive) {
@@ -367,7 +381,7 @@
     if (optCol) {
       va = optCol.sortVal(a) || "";
       vb = optCol.sortVal(b) || "";
-    } else if (key === "AHL" || key === "IGA_AO" || key === "HEAS") {
+    } else if (key === "AHL" || key === "IGA_AO" || key === "IGA_TTAS" || key === "HEAS") {
       va = a.havalimani_var[key] ? "VAR" : "YOK";
       vb = b.havalimani_var[key] ? "VAR" : "YOK";
     } else if (key === "egitim") {
@@ -395,7 +409,13 @@
       }
       if (filters.baskanlik.length && !filters.baskanlik.includes(r.baskanlik)) return false;
       if (filters.unvan.length && !filters.unvan.includes(r.unvan)) return false;
-      if (filters.havalimani && !r.havalimani_var[filters.havalimani]) return false;
+      for (const h of Model.HAVALIMANLARI) {
+        const durum = filters.havalimaniDurum[h];
+        if (!durum) continue;
+        const varMi = r.havalimani_var[h];
+        if (durum === "VAR" && !varMi) return false;
+        if (durum === "YOK" && varMi) return false;
+      }
       if (filters.egitimDurumu && r.egitim_durumu !== filters.egitimDurumu) return false;
       return true;
     });
@@ -409,19 +429,21 @@
     const dolmus = rows.filter((r) => r.egitim_durumu === "Süresi Dolmuş").length;
     const ahl = rows.filter((r) => r.havalimani_var.AHL).length;
     const iga = rows.filter((r) => r.havalimani_var.IGA_AO).length;
+    const igaTtas = rows.filter((r) => r.havalimani_var.IGA_TTAS).length;
     const heas = rows.filter((r) => r.havalimani_var.HEAS).length;
     const esikGun = currentSettings.uyari_esik_gun;
-    const filtreAktif = !!(filters.q || filters.baskanlik.length || filters.unvan.length || filters.havalimani || filters.egitimDurumu);
+    const filtreAktif = anyFilterActive();
 
     // Maliyet Tablosu, ana tablo ile aynı filtrelenmiş görünüme göre hesaplanır
     // (örn. Unvan filtresi uygulanırsa yalnızca o unvana ait maliyet gösterilir).
     const m = currentSettings.maliyetler;
     const gbsSayi = rows.filter((r) => r.guncel_egitim).length;
     const igaTutar = m.IGA_AO * iga;
+    const igaTtasTutar = m.IGA_TTAS * igaTtas;
     const ahlTutar = m.AHL * ahl;
     const heasTutar = m.HEAS * heas;
     const gbsTutar = m.GBS * gbsSayi;
-    const kartTutarToplam = ahlTutar + igaTutar + heasTutar;
+    const kartTutarToplam = ahlTutar + igaTutar + igaTtasTutar + heasTutar;
     const toplamGider = kartTutarToplam + gbsTutar;
     const maliyetEtiket = `${filtreAktif ? "Filtrelenen" : "Tüm Şirket"} (${N.formatNumberTr(rows.length)} Personel)`;
 
@@ -436,6 +458,7 @@
           <div class="stat-chip-row">
             ${airportChip("AHL", N.formatNumberTr(ahl), "blue")}
             ${airportChip("İGA", N.formatNumberTr(iga), "teal")}
+            ${airportChip("İGA TTAŞ", N.formatNumberTr(igaTtas), "violet")}
             ${airportChip("HEAŞ", N.formatNumberTr(heas), "neutral")}
           </div>
         </div>
@@ -460,9 +483,10 @@
         <div class="stat-panel__row stat-panel__row--cost">
           ${costItem("AHL", ahlTutar, `${N.formatTL(m.AHL)} × ${N.formatNumberTr(ahl)} Kart`, "blue")}
           ${costItem("İGA", igaTutar, `${N.formatTL(m.IGA_AO)} × ${N.formatNumberTr(iga)} Kart`, "teal")}
+          ${costItem("İGA TTAŞ", igaTtasTutar, `${N.formatTL(m.IGA_TTAS)} × ${N.formatNumberTr(igaTtas)} Kart`, "violet")}
           ${costItem("HEAŞ (SAW)", heasTutar, `${N.formatTL(m.HEAS)} (${m.HEAS_eur}€) × ${N.formatNumberTr(heas)} Kart`, "neutral")}
           <span class="stat-panel__divider"></span>
-          ${costItem("Kart Ücretleri Toplamı", kartTutarToplam, `${N.formatNumberTr(ahl + iga + heas)} Kart · 3 Havalimanı`, "amber")}
+          ${costItem("Kart Ücretleri Toplamı", kartTutarToplam, `${N.formatNumberTr(ahl + iga + igaTtas + heas)} Kart · 4 Havalimanı`, "amber")}
           ${costItem("Sertifika Giderleri", gbsTutar, `${N.formatTL(m.GBS)} × ${N.formatNumberTr(gbsSayi)} Kart Sahibi`, "red")}
           <div class="stat-panel__total">
             <span class="stat-panel__item-label">Toplam Gider</span>
@@ -511,9 +535,10 @@
     const tbody = qs(root, "#dash-tbody");
     const optCols = activeColumns.map(optionalColumnByKey).filter(Boolean);
     qs(root, "#dash-count").textContent = `${N.formatNumberTr(rows.length)} kayıt`;
+    updateClearFiltersVisibility(root);
 
     if (!rows.length) {
-      tbody.innerHTML = `<tr><td colspan="${9 + optCols.length}"><div class="table-empty">Filtrelere uyan kayıt bulunamadı.</div></td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="${10 + optCols.length}"><div class="table-empty">Filtrelere uyan kayıt bulunamadı.</div></td></tr>`;
       return;
     }
 
@@ -527,6 +552,7 @@
         <td>${escapeHtml(r.baskanlik || "—")}</td>
         <td>${varYokBadge(r.havalimani_var.AHL)}</td>
         <td>${varYokBadge(r.havalimani_var.IGA_AO)}</td>
+        <td>${varYokBadge(r.havalimani_var.IGA_TTAS)}</td>
         <td>${varYokBadge(r.havalimani_var.HEAS)}</td>
         <td>${egitimBadge(r.egitim_durumu)}</td>
         <td>${egitimTarihHucresi(r.guncel_egitim)}</td>
@@ -566,7 +592,7 @@
     // Ekranda o an görünen isteğe bağlı sütunlar da dahil edilir (WYSIWYG).
     const optCols = activeColumns.map(optionalColumnByKey).filter(Boolean);
     const header = [
-      "TC KİMLİK NO", "AD SOYAD", "UNVAN", "BAŞKANLIK", "AHL", "İGA", "HEAŞ", "GÜV. BİL. DURUM", "GÜV. BİL. BİTİŞ",
+      "TC KİMLİK NO", "AD SOYAD", "UNVAN", "BAŞKANLIK", "AHL", "İGA", "İGA TTAŞ", "HEAŞ", "GÜV. BİL. DURUM", "GÜV. BİL. BİTİŞ",
       ...optCols.map((c) => N.turkishUpper(c.label)),
     ];
     const data = rows.map((r) => [
@@ -576,6 +602,7 @@
       r.baskanlik,
       r.havalimani_var.AHL ? "VAR" : "YOK",
       r.havalimani_var.IGA_AO ? "VAR" : "YOK",
+      r.havalimani_var.IGA_TTAS ? "VAR" : "YOK",
       r.havalimani_var.HEAS ? "VAR" : "YOK",
       r.egitim_durumu,
       r.guncel_egitim ? N.formatDateTr(r.guncel_egitim.bitis_tarihi) : "—",

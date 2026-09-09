@@ -151,10 +151,11 @@ Font dosyalarının kaynağı doğrulanamadı (dfonts.org — lisanssız); bu do
 
 ## Ekler
 
-Bu README ile birlikte, gerçek verilerin yapısını birebir yansıtan ama **tamamen uydurma (sahte) kişilerle** doldurulmuş 4 örnek Excel dosyası hazırlandı:
+Bu README ile birlikte, gerçek verilerin yapısını birebir yansıtan ama **tamamen uydurma (sahte) kişilerle** doldurulmuş örnek Excel dosyaları hazırlandı:
 
 - `AHL_apron_sahte.xlsx`
 - `IGA_AO_apron_sahte.xlsx`
+- `IGA_TTAS_apron_sahte.xlsx` — İGA AO ile birebir aynı sütun yapısında, ayrı 4. havalimanı kaynağı
 - `HEAS_apron_sahte.xlsx`
 - `PERSONEL_UNVAN_LISTESI_sahte.xlsx` (unvan/başkanlık kaynağı)
 - `ARAC_KARTI_LISTESI_sahte.xlsx` — "Yeni Excel Türü Ekle" sihirbazını denemek için örnek özel kaynak (TC Kimlik No, Plaka, Araç Modeli)
@@ -171,7 +172,7 @@ Konuşulup netleşti: sistem **tamamen tarayıcı içinde, sunucusuz** çalış�
 
 `index.html` dosyasına çift tıklamanız yeterli — tarayıcıda doğrudan açılır, kurulum ya da sunucu gerekmez. (Önceki sürümde bir Node sunucusu vardı; IndexedDB `file://` altında bazı tarayıcılarda güvenilir çalışmadığı için gerekiyordu. Depolama katmanı localStorage'a geçirildi — o dosya://'da sorunsuz çalışıyor — ve sunucu tamamen kaldırıldı.)
 
-Örnek (sahte) Excel dosyalarını yeniden üretmek isterseniz: `npm run generate-sample-data` → `sample-data/` klasörüne 4 dosya yazar (yalnızca bu adım Node gerektirir).
+Örnek (sahte) Excel dosyalarını yeniden üretmek isterseniz: `npm run generate-sample-data` → `sample-data/` klasörüne 5 dosya yazar (yalnızca bu adım Node gerektirir).
 
 > **Not:** localStorage tarayıcı başına ~5-10 MB ile sınırlıdır (IndexedDB'den çok daha küçük). Birkaç bin personel + kart + eğitim kaydı için yeterlidir; çok daha büyük ölçekte (on binlerce kayıt) dolabilir — o noktada Ayarlar'daki "Tüm Verileri Sıfırla" ile temizlenip yeniden içe aktarılması ya da depolamanın tekrar IndexedDB'ye çevrilmesi gerekebilir.
 
@@ -190,7 +191,7 @@ assets/js/data/
   import.js                       Excel okuma + mapping uygulama + modele yazma
 assets/js/ui/                    Ekranlar (dashboard, import-view, alerts, history,
                                  settings) + modal/toast/icon/multiselect/util yardımcıları
-scripts/generate-sample-data.js  4 sahte örnek Excel'i üretir (yalnızca bunun için Node gerekir)
+scripts/generate-sample-data.js  5 sahte örnek Excel'i üretir (yalnızca bunun için Node gerekir)
 sample-data/                     Üretilen sahte Excel dosyaları
 ```
 
@@ -208,7 +209,9 @@ sample-data/                     Üretilen sahte Excel dosyaları
 | 8 | Manuel "Excel Yükle" butonları | Tamamlandı — otomatik senkronizasyon yok |
 | 9 | Taşeron "Bilgi" butonu | Tamamlandı — AHL: İşletme, İGA: Taşeron Firma; HEAŞ'ta alan yok, buton pasif |
 
-Ek olarak (orijinal kapsamın ötesinde, kullanım sırasında eklenen): "Excel'e Aktar" (konsolide görünümü dışa aktarma), isimlerin Türkçe kurallarına göre okunabilir biçime (İlk Harf Büyük) çevrilmesi, sekmeler arası hızlı geçişte oluşabilecek yarış durumlarına karşı koruma, sütun bazlı sıralama, aranabilir/çoklu seçimli filtre menüleri, Genel Bakış tablosuna isteğe bağlı sütun ekleme ("Sütun Ekle", en fazla 5, kalıcı), Maliyet Tablosu paneli, **"Yeni Excel Türü Ekle"** — sistemde tanımlı olmayan bir Excel'i (TC Kimlik No + istediğiniz sütunları eşleyerek) kalıcı bir kaynak olarak tanımlayabilme; sonradan Ayarlar > Özel Kaynaklar'dan düzenlenebilir/silinebilir, sütunları da "Sütun Ekle" panelinde belirir; ve sabit 4 kaynağın (AHL/İGA/HEAŞ/Personel) Ayarlar > Eşleştirme Profilleri ekranına eklenen **"Ek Sütunlar"** — bu kaynakların Excel'ine sonradan eklenen, sabit şemada karşılığı olmayan sütunları kod değişikliği olmadan tanımlayabilme (aynı "Sütun Ekle" panelinde belirir). (Ayrıca kart durumuna göre aktif/pasif hesaplaması AHL için de forward-compatible hale getirildi — bkz. model.js upsertApronKart; bir "Pasif Kartlar" görünümü denenmiş ama şimdilik kaldırılmıştır, kodu assets/js/ui/pasif.js içinde kullanılmadan duruyor.)
+Ek olarak (orijinal kapsamın ötesinde, kullanım sırasında eklenen): "Excel'e Aktar" (konsolide görünümü dışa aktarma), isimlerin Türkçe kurallarına göre okunabilir biçime (İlk Harf Büyük) çevrilmesi, sekmeler arası hızlı geçişte oluşabilecek yarış durumlarına karşı koruma, sütun bazlı sıralama, aranabilir/çoklu seçimli filtre menüleri, Genel Bakış tablosuna isteğe bağlı sütun ekleme ("Sütun Ekle", en fazla 5, kalıcı), Maliyet Tablosu paneli, **"Yeni Excel Türü Ekle"** — sistemde tanımlı olmayan bir Excel'i (TC Kimlik No + istediğiniz sütunları eşleyerek) kalıcı bir kaynak olarak tanımlayabilme; sonradan Ayarlar > Özel Kaynaklar'dan düzenlenebilir/silinebilir, sütunları da "Sütun Ekle" panelinde belirir; ve sabit kaynakların (AHL/İGA AO/İGA TTAŞ/HEAŞ/Personel) Ayarlar > Eşleştirme Profilleri ekranına eklenen **"Ek Sütunlar"** — bu kaynakların Excel'ine sonradan eklenen, sabit şemada karşılığı olmayan sütunları kod değişikliği olmadan tanımlayabilme (aynı "Sütun Ekle" panelinde belirir). (Ayrıca kart durumuna göre aktif/pasif hesaplaması AHL için de forward-compatible hale getirildi — bkz. model.js upsertApronKart; bir "Pasif Kartlar" görünümü denenmiş ama şimdilik kaldırılmıştır, kodu assets/js/ui/pasif.js içinde kullanılmadan duruyor.)
+
+**4. havalimanı kaynağı — İGA TTAŞ (orijinal kapsamın ötesinde):** Sistem başlangıçta 3 sabit havalimanı (AHL, İGA AO, HEAŞ) için tasarlanmıştı; kullanım sırasında İGA AO ile birebir aynı sütun yapısına sahip ama ayrı bir dosya olarak yüklenen **4. bir kaynak (İGA TTAŞ)** eklendi. Kendi VAR/YOK sütunu, kendi kart ücreti/Maliyet Tablosu kutusu, kendi Havalimanı filtresi ve kendi Eşleştirme Profili var — diğer 3 kaynaktan tamamen bağımsız aktif/pasif ve maliyet hesaplanır. `Model.HAVALIMANLARI` dizisine eklenmesi yeterli oldu; kişi detay modalı, Eğitim Süreleri ve İçe Aktarma Geçmişi zaten bu listeyi döngüyle kullandığı için otomatik uyum sağladı — yalnızca dashboard.js'teki sabit (hardcoded) 3-havalimanlı tablo/istatistik/dışa aktarma şablonlarının 4. sütunu içerecek şekilde genişletilmesi gerekti.
 
 ### 10.5 Açık soru #3 nasıl ele alındı
 
@@ -216,6 +219,6 @@ Eğitim geçerlilik süresinin (3/5 yıl) hangi kritere göre atandığı hâlâ
 
 ### 10.6 Test durumu
 
-Uygulama, 4 örnek (sahte) Excel dosyasıyla uçtan uca otomatik olarak (Playwright ile) test edildi: içe aktarma, konsolide görünüm hesaplamaları (VAR/YOK, çoklu havalimanı sayısı, eğitim durumları), filtreleme, personel detay modalı, taşeron bilgi butonu, uyarılar, içe aktarma geçmişi, ayarlar ve sayfa yenilendikten sonra verinin kalıcı kalması (localStorage) doğrulandı. Konsol hatası yok.
+Uygulama, örnek (sahte) Excel dosyalarıyla uçtan uca otomatik olarak (Playwright ile) test edildi: içe aktarma, konsolide görünüm hesaplamaları (VAR/YOK, çoklu havalimanı sayısı, eğitim durumları), filtreleme, personel detay modalı, taşeron bilgi butonu, uyarılar, içe aktarma geçmişi, ayarlar ve sayfa yenilendikten sonra verinin kalıcı kalması (localStorage) doğrulandı. 4. havalimanı kaynağı (İGA TTAŞ) eklendikten sonra da aynı senaryolar (VAR/YOK'un diğer 3 kaynaktan bağımsız hesaplanması, Maliyet Tablosu, Havalimanı filtresi, kişi detay modalı, Ayarlar) ayrıca test edildi. Konsol hatası yok.
 
 Sırada: Gerçek AHL/İGA/HEAŞ ve personel Excel dosyalarıyla deneme (sütun adları örnektekiyle birebir aynı değilse Ayarlar'dan eşleştirme güncellenir), açık soru #3'ün netleştirilmesi, ve talep gelirse lisanslı FF Mark font dosyalarının eklenmesi.

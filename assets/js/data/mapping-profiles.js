@@ -15,6 +15,7 @@
   const KAYNAKLAR = {
     AHL: { key: "AHL", etiket: "AHL" },
     IGA_AO: { key: "IGA_AO", etiket: "İGA AO" },
+    IGA_TTAS: { key: "IGA_TTAS", etiket: "İGA TTAŞ" },
     HEAS: { key: "HEAS", etiket: "HEAŞ (SAW)" },
     PERSONEL: { key: "PERSONEL", etiket: "Personel / Unvan Listesi" },
   };
@@ -68,9 +69,34 @@
       ek_alanlar: [],
     },
 
+    // İGA TTAŞ: ayrı bir dosya olarak yüklenen, İGA AO'dan bağımsız 4. kaynak —
+    // ama Excel'i aynı taşeron/apron başvuru sistemi üzerinden geldiği için
+    // sütun başlıkları İGA AO ile birebir aynı (kullanıcı isteği).
+    IGA_TTAS: {
+      kaynak: "IGA_TTAS",
+      aciklama: "Form No, Müracaat Türü, Onay Durumu, Kurumu, Taşeron Firma, Adı, Soyadı, T.C. Kimlik No/Pasaport No, Bölüm, Unvan, Doküman Bitiş Tarihi, Kartın Durumu, Başlangıç Tarihi, Bitiş Tarihi, Kart Ücreti, Pasif Açıklama sütunlarını içeren İGA TTAŞ apron Excel'i (İGA AO ile aynı sütun yapısı, ayrı dosya).",
+      alanlar: [
+        { hedef_alan: "tc_kimlik_no", excel_sutun: "T.C. Kimlik No/Pasaport No", zorunlu: true },
+        { hedef_alan: "ad", excel_sutun: "Adı", zorunlu: true },
+        { hedef_alan: "soyad", excel_sutun: "Soyadı", zorunlu: true },
+        { hedef_alan: "unvan", excel_sutun: "Unvan", zorunlu: false },
+        { hedef_alan: "baskanlik", excel_sutun: "Bölüm", zorunlu: false },
+        { hedef_alan: "kart_no", excel_sutun: "Form No", zorunlu: false },
+        { hedef_alan: "kart_durumu", excel_sutun: "Kartın Durumu", zorunlu: false },
+        { hedef_alan: "baslangic_tarihi", excel_sutun: "Başlangıç Tarihi", zorunlu: false },
+        { hedef_alan: "bitis_tarihi", excel_sutun: "Bitiş Tarihi", zorunlu: false },
+        { hedef_alan: "taseron_firma", excel_sutun: "Taşeron Firma", zorunlu: false },
+        { hedef_alan: "egitim_tarihi", excel_sutun: "Bitiş Tarihi", zorunlu: false },
+        { hedef_alan: "gecerlilik_yili", excel_sutun: "", zorunlu: false },
+        { hedef_alan: "pasif_aciklama", excel_sutun: "Pasif Açıklama", zorunlu: false },
+      ],
+      ek_alanlar: [],
+    },
+
     HEAS: {
       kaynak: "HEAS",
-      aciklama: "Sıra No, TC-No, Ad, Soyad, Bölüm, Açık Bölüm, Görev, Kartın Cinsi, Müracaat Tipi, Müracaat Tarihi, Teslim Tarihi, Kart Durum, Eğitim Tarihi, Dönemi sütunlarını içeren HEAŞ (SAW) apron Excel'i.",
+      aciklama:
+        "Sıra No, TC-No, Ad, Soyad, Ad Soyad, Bölüm, Açık Bölüm, Görev, Kartın Cinsi, Müracaat Tipi, Müracaat Tarihi, Teslim Tarihi, İade Tarihi, Kayıp Bild. Tarihi, Son Tarih, Eğitim / Kurs-1, Mur Durum, Kart Durum, KAB Tarih, Randevu Tarihi, Eğitim Tarihi, Dönemi sütunlarını içeren HEAŞ (SAW) apron Excel'i.",
       alanlar: [
         { hedef_alan: "tc_kimlik_no", excel_sutun: "TC-No", zorunlu: true },
         { hedef_alan: "ad", excel_sutun: "Ad", zorunlu: true },
@@ -85,7 +111,23 @@
         { hedef_alan: "gecerlilik_yili", excel_sutun: "Dönemi", zorunlu: false },
         { hedef_alan: "kart_cinsi", excel_sutun: "Kartın Cinsi", zorunlu: false },
       ],
-      ek_alanlar: [],
+      // "Sıra No" (satır sırası, kişiye özgü anlamlı bilgi değil) ve "Ad Soyad"
+      // (zaten Ad+Soyad'dan geliyor) kasıtlı olarak eşlenmedi; geri kalan yeni
+      // sütunlar veri kaybolmasın diye Ek Sütun olarak eklendi — Ayarlar'dan
+      // istenirse kaldırılabilir/etiketi değiştirilebilir (bkz. README §6).
+      // Not: kaynak adı ("HEAŞ (SAW)") dashboard.js'te otomatik eklendiği için
+      // etikete tekrar yazılmaz (bkz. buildCustomColumns).
+      ek_alanlar: [
+        { key: "muracaat_tipi", excel_sutun: "Müracaat Tipi", etiket: "Müracaat Tipi" },
+        { key: "teslim_tarihi", excel_sutun: "Teslim Tarihi", etiket: "Teslim Tarihi" },
+        { key: "iade_tarihi", excel_sutun: "İade Tarihi", etiket: "İade Tarihi" },
+        { key: "kayip_bild_tarihi", excel_sutun: "Kayıp Bild. Tarihi", etiket: "Kayıp Bild. Tarihi" },
+        { key: "son_tarih", excel_sutun: "Son Tarih", etiket: "Son Tarih" },
+        { key: "egitim_kurs_1", excel_sutun: "Eğitim / Kurs-1", etiket: "Eğitim / Kurs-1" },
+        { key: "mur_durum", excel_sutun: "Mur Durum", etiket: "Mur Durum" },
+        { key: "kab_tarih", excel_sutun: "KAB Tarih", etiket: "KAB Tarih" },
+        { key: "randevu_tarihi", excel_sutun: "Randevu Tarihi", etiket: "Randevu Tarihi" },
+      ],
     },
 
     PERSONEL: {

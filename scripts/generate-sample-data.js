@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* ============================================================
    generate-sample-data.js — README §"Ekler" bölümünde sözü
-   edilen 4 örnek (sahte) Excel dosyasını üretir. Tüm kişiler,
+   edilen 5 örnek (sahte) Excel dosyasını üretir. Tüm kişiler,
    sicil numaraları ve T.C. Kimlik No'lar TAMAMEN UYDURMADIR;
    gerçek hiçbir kişiyi temsil etmez. Amaç: çoklu havalimanı,
    taşeron, pasif kart ve eğitim süresi (3/5 yıl) senaryolarını
@@ -75,6 +75,27 @@ writeSheet(
 );
 
 // ---------------------------------------------------------------
+// İGA TTAŞ — İGA AO ile BİREBİR AYNI sütun yapısı, ayrı dosya/kaynak
+// (bkz. mapping-profiles.js IGA_TTAS). Bazı kişiler İGA AO ile ortak
+// (VAR/YOK'un havalimanı bazında bağımsız çalıştığını göstermek için),
+// bazıları yalnızca İGA TTAŞ'ta.
+// ---------------------------------------------------------------
+writeSheet(
+  "IGA_TTAS_apron_sahte.xlsx",
+  [
+    "Form No", "Müracaat Türü", "Onay Durumu", "Kurumu", "Taşeron Firma", "Adı", "Soyadı",
+    "T.C. Kimlik No/Pasaport No", "Bölüm", "Unvan", "Doküman Bitiş Tarihi", "Kartın Durumu",
+    "Başlangıç Tarihi", "Bitiş Tarihi", "Kart Ücreti", "Pasif Açıklama",
+  ],
+  [
+    ["TTAS-201", "Yeni", "Onaylandı", "Taşeron", "Kartal Yer Hizmetleri A.Ş.", "AHMET", "YILMAZ", "10000000010", "Yer Hizmetleri", "Apron Kontrol Uzmanı", d("2027-04-01"), "Aktif", d("2024-04-01"), d("2024-04-01"), 350, ""],
+    ["TTAS-202", "Yeni", "Onaylandı", "Taşeron", "Nova Güvenlik Hizmetleri Ltd. Şti.", "MEHMET", "KAYA", "10000000032", "Güvenlik", "Güvenlik Görevlisi", d("2025-02-10"), "Aktif", d("2020-02-10"), d("2020-02-10"), 350, ""],
+    ["TTAS-203", "Yeni", "Onaylandı", "Taşeron", "Baltic Ground Services", "SERKAN", "BULUT", "10000000121", "Ramp Operasyon", "Ramp Sorumlusu", d("2026-07-01"), "Aktif", d("2023-07-01"), d("2023-07-01"), 350, ""],
+    ["TTAS-204", "Yenileme", "Onaylandı", "Taşeron", "Nova Güvenlik Hizmetleri Ltd. Şti.", "NUR", "AKSOY", "10000000132", "İnsan Kaynakları", "İnsan Kaynakları Uzmanı", d("2021-09-01"), "Pasif", d("2021-09-01"), d("2021-09-01"), 350, "Sözleşme feshedildi"],
+  ]
+);
+
+// ---------------------------------------------------------------
 // HEAŞ (SAW) — Sıra No, TC-No, Ad, Soyad, Bölüm, Açık Bölüm,
 // Görev, Kartın Cinsi, Müracaat Tipi, Müracaat Tarihi, Teslim
 // Tarihi, Kart Durum, Eğitim Tarihi, Dönemi
@@ -120,4 +141,4 @@ writeSheet(
   ]
 );
 
-console.log("\n4 sahte örnek Excel dosyası sample-data/ klasörüne yazıldı.");
+console.log("\n5 sahte örnek Excel dosyası sample-data/ klasörüne yazıldı.");

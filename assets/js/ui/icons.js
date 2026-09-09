@@ -27,6 +27,7 @@
     chevronUp: '<path d="M6 15l6-6 6 6"/>',
     chevronDown: '<path d="M6 9l6 6 6-6"/>',
     plus: '<path d="M12 5v14"/><path d="M5 12h14"/>',
+    filter: '<polygon points="21 4 3 4 10 12.46 10 19 14 21 14 12.46 21 4"/>',
   };
 
   function icon(name, { size = 16, className = "" } = {}) {
