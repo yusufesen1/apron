@@ -40,6 +40,9 @@
         { hedef_alan: "egitim_tarihi", excel_sutun: "", zorunlu: false },
         { hedef_alan: "gecerlilik_yili", excel_sutun: "", zorunlu: false },
       ],
+      // Ayarlar > Eşleştirme Profilleri'nden eklenen, sabit şemada karşılığı
+      // olmayan ek sütunlar (bkz. README §6). TC Kimlik No ile kişiye bağlanır.
+      ek_alanlar: [],
     },
 
     IGA_AO: {
@@ -62,6 +65,7 @@
         { hedef_alan: "gecerlilik_yili", excel_sutun: "", zorunlu: false },
         { hedef_alan: "pasif_aciklama", excel_sutun: "Pasif Açıklama", zorunlu: false },
       ],
+      ek_alanlar: [],
     },
 
     HEAS: {
@@ -81,6 +85,7 @@
         { hedef_alan: "gecerlilik_yili", excel_sutun: "Dönemi", zorunlu: false },
         { hedef_alan: "kart_cinsi", excel_sutun: "Kartın Cinsi", zorunlu: false },
       ],
+      ek_alanlar: [],
     },
 
     PERSONEL: {
@@ -94,6 +99,7 @@
         { hedef_alan: "unvan", excel_sutun: "UNVAN", zorunlu: false },
         { hedef_alan: "baskanlik", excel_sutun: "BAŞKANLIK", zorunlu: false },
       ],
+      ek_alanlar: [],
     },
   };
 

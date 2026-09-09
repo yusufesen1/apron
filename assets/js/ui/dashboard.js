@@ -157,11 +157,11 @@
       </div>
     `;
 
-    const [rows, settings, customKaynaklar] = await Promise.all([Model.buildPivotRows(), Model.getSettings(), Model.getCustomKaynaklar()]);
+    const [rows, settings, extraFieldSources] = await Promise.all([Model.buildPivotRows(), Model.getSettings(), Model.getExtraFieldSources()]);
     if (!isActive()) return; // kullanıcı bu sırada başka bir sekmeye geçti
     allRows = rows;
     currentSettings = settings;
-    allOptionalColumns = BUILTIN_OPTIONAL_COLUMNS.concat(buildCustomColumns(customKaynaklar));
+    allOptionalColumns = BUILTIN_OPTIONAL_COLUMNS.concat(buildCustomColumns(extraFieldSources));
     activeColumns = (settings.secili_sutunlar || []).filter((k) => optionalColumnByKey(k));
     setupFilterMultiselects(root);
     setupColumnPicker(root, isActive);

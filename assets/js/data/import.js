@@ -56,6 +56,19 @@
       if (alan.zorunlu && !value) eksikZorunlu.push(alan.hedef_alan);
     });
 
+    // Ayarlar > Eşleştirme Profilleri'nden eklenen, sabit şemada karşılığı
+    // olmayan ek sütunlar — "Yeni Excel Türü Ekle" ile aynı mantıkla, TC
+    // Kimlik No üzerinden kişiye bağlanacak ayrı bir obje olarak toplanır.
+    if (profile.ek_alanlar && profile.ek_alanlar.length) {
+      const ek = {};
+      profile.ek_alanlar.forEach((alan) => {
+        if (!alan.excel_sutun) return;
+        const key = headerIndex[normalizeHeader(alan.excel_sutun)];
+        ek[alan.key] = key !== undefined ? N.cleanText(rawRow[key]) : "";
+      });
+      out.__ek = ek;
+    }
+
     return { out, eksikZorunlu };
   }
 
@@ -132,6 +145,10 @@
       if (kaynak !== "PERSONEL") {
         await Model.upsertApronKart(out, kaynak, importId);
         await Model.upsertEgitimKaydi(out, kaynak, importId, settings);
+      }
+
+      if (out.__ek && Object.keys(out.__ek).length) {
+        await Model.upsertCustomVeri(kaynak, out.tc_kimlik_no, out.__ek, file.name, importId);
       }
 
       const isNew = kaynak === "PERSONEL" ? !existingPersonel : !existingKart;

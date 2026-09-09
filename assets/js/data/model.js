@@ -67,6 +67,24 @@
     return Store.delete("mapping_profiles", kaynak);
   }
 
+  /**
+   * Sabit kaynakların (AHL/İGA/HEAŞ/Personel) Ayarlar'dan eklenmiş "Ek Sütunlar"ı
+   * ile sihirbazla oluşturulan özel kaynakları TEK bir listede birleştirir.
+   * Dashboard "Sütun Ekle" paneli, kaynağın sabit ya da kullanıcı tanımlı olması
+   * fark etmeksizin bu birleşik listeyi kullanır (bkz. dashboard.js buildCustomColumns).
+   */
+  async function getExtraFieldSources() {
+    const [profiles, customKaynaklar] = await Promise.all([getAllMappingProfiles(), getCustomKaynaklar()]);
+    const sabitKaynaklar = Object.keys(profiles)
+      .filter((k) => profiles[k].ek_alanlar && profiles[k].ek_alanlar.length)
+      .map((k) => ({
+        id: k,
+        ad: global.Apron.mapping.KAYNAKLAR[k].etiket,
+        alanlar: profiles[k].ek_alanlar,
+      }));
+    return sabitKaynaklar.concat(customKaynaklar);
+  }
+
   // ---------- Özel (kullanıcı tanımlı) kaynaklar ----------
   // "Yeni Excel Türü Ekle" ile oluşturulan, TC Kimlik No üzerinden kişilere
   // bağlanan, VAR/YOK veya maliyet anlamı taşımayan genel ek bilgi kaynakları.
@@ -162,9 +180,11 @@
     const id = kartId(row.tc_kimlik_no, kaynak);
     const existing = await Store.get("apron_kartlari", id);
 
-    // AHL kaynağında kart durumu sütunu yok: kayıt Excel'de listeleniyorsa
-    // aktif kart olarak kabul edilir (bkz. README §3.3 açık not; Ayarlar'da belirtilir).
-    const aktif = kaynak === "AHL" ? true : N.isDurumAktif(row.kart_durumu, { defaultWhenMissing: null });
+    // Kart Durumu sütunu boşsa (bugün için AHL'de olduğu gibi, bkz. README §3.3)
+    // kayıt Excel'de listeleniyorsa aktif kabul edilir. Ayarlar'dan bu kaynağa
+    // bir "Kart Durumu" sütunu eşlenip Excel'de değer gelmeye başlarsa, diğer
+    // kaynaklarla aynı mantıkla (AKTİF/PASİF metnine göre) değerlendirilir.
+    const aktifDegerlendirmesi = N.isDurumAktif(row.kart_durumu, { defaultWhenMissing: null });
 
     const kart = {
       id,
@@ -172,7 +192,7 @@
       havalimani: kaynak,
       kart_no: row.kart_no || (existing ? existing.kart_no : ""),
       kart_durumu_ham: row.kart_durumu || "",
-      aktif: aktif === null ? true : aktif,
+      aktif: aktifDegerlendirmesi === null ? true : aktifDegerlendirmesi,
       baslangic_tarihi: row.baslangic_tarihi || (existing ? existing.baslangic_tarihi : null),
       bitis_tarihi: row.bitis_tarihi || (existing ? existing.bitis_tarihi : null),
       taseron_firma: row.taseron_firma || (existing ? existing.taseron_firma : ""),
@@ -335,6 +355,7 @@
     getAllMappingProfiles,
     saveMappingProfile,
     resetMappingProfile,
+    getExtraFieldSources,
     kartId,
     upsertPersonelFromRow,
     upsertApronKart,

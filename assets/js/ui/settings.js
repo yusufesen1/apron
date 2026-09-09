@@ -172,11 +172,31 @@
             )
             .join("")}
         </div>
+
+        <div class="row row--between" style="margin-top:20px;margin-bottom:8px">
+          <span style="font-size:11px;color:var(--muted-2);text-transform:uppercase">Ek Sütunlar (opsiyonel)</span>
+          <button type="button" class="btn btn--sm" data-add-ek="${profile.kaynak}">+ Sütun Ekle</button>
+        </div>
+        <p class="card__meta" style="margin-bottom:12px">Excel'e sonradan eklenen, sistemde henüz karşılığı olmayan sütunları burada tanımlayın. T.C. Kimlik No üzerinden kişiye bağlanır, Genel Bakış'taki "Sütun Ekle" panelinde görünür.</p>
+        <div class="stack stack--sm" data-ek-list="${profile.kaynak}">
+          ${(profile.ek_alanlar || []).map(ekRowHtml).join("")}
+        </div>
+
         <div class="row" style="margin-top:16px;gap:8px">
           <button type="button" class="btn btn--primary btn--sm" data-save-profile="${profile.kaynak}">Eşlemeyi Kaydet</button>
           <button type="button" class="btn btn--sm" data-reset-profile="${profile.kaynak}">Varsayılana Döndür</button>
         </div>
       </details>
+    `;
+  }
+
+  function ekRowHtml(a) {
+    return `
+      <div class="row ek-row" style="gap:12px" data-ek-key="${escapeHtml(a.key || "")}">
+        <input class="input" style="min-width:220px;flex:1" data-ek-excel value="${escapeHtml(a.excel_sutun || "")}" placeholder="Excel sütun başlığı" />
+        <input class="input" style="flex:1" data-ek-etiket value="${escapeHtml(a.etiket || "")}" placeholder="Ekrandaki etiket" />
+        <button type="button" class="btn btn--sm" data-remove-ek title="Sütunu kaldır">${global.Apron.icon("close", { size: 12 })}</button>
+      </div>
     `;
   }
 
@@ -211,6 +231,24 @@
       global.Apron.toast.show("Eğitim ücretleri kaydedildi.", { tone: "positive" });
     });
 
+    qsa(root, "[data-add-ek]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const list = qs(root, `[data-ek-list="${btn.dataset.addEk}"]`);
+        const wrap = document.createElement("div");
+        wrap.innerHTML = ekRowHtml({ key: "", excel_sutun: "", etiket: "" }).trim();
+        const rowEl = wrap.firstElementChild;
+        list.appendChild(rowEl);
+        wireEkRemove(rowEl);
+        qs(rowEl, "[data-ek-excel]").focus();
+      });
+    });
+
+    qsa(root, ".ek-row").forEach(wireEkRemove);
+
+    function wireEkRemove(rowEl) {
+      qs(rowEl, "[data-remove-ek]").addEventListener("click", () => rowEl.remove());
+    }
+
     qsa(root, "[data-save-profile]").forEach((btn) => {
       btn.addEventListener("click", async () => {
         const kaynak = btn.dataset.saveProfile;
@@ -221,8 +259,35 @@
           const input = qs(details, `[data-field="${a.hedef_alan}"]`);
           if (input) a.excel_sutun = input.value.trim();
         });
+
+        const ekAlanlar = [];
+        const usedKeys = new Set();
+        let ekHata = false;
+        qsa(details, ".ek-row").forEach((rowEl) => {
+          const excelSutun = qs(rowEl, "[data-ek-excel]").value.trim();
+          const etiket = qs(rowEl, "[data-ek-etiket]").value.trim();
+          if (!excelSutun && !etiket) return; // boş satır — atlanır
+          if (!excelSutun || !etiket) {
+            ekHata = true;
+            return;
+          }
+          let key = rowEl.dataset.ekKey;
+          if (!key) {
+            key = global.Apron.customSource.slugify(etiket);
+            let n = 2;
+            while (usedKeys.has(key)) key = `${global.Apron.customSource.slugify(etiket)}_${n++}`;
+          }
+          usedKeys.add(key);
+          ekAlanlar.push({ key, excel_sutun: excelSutun, etiket });
+        });
+        if (ekHata) {
+          global.Apron.toast.show("Ek sütunlarda hem Excel sütun başlığı hem de ekrandaki etiket dolu olmalı — eksik satır kaydedilmedi.");
+        }
+        next.ek_alanlar = ekAlanlar;
+
         await Model.saveMappingProfile(next);
         global.Apron.toast.show(`${Mapping.KAYNAKLAR[kaynak].etiket} eşlemesi kaydedildi.`, { tone: "positive" });
+        render(root);
       });
     });
 
