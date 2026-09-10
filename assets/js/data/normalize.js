@@ -132,8 +132,13 @@
   function parseGecerlilikYili(v) {
     if (v == null) return null;
     const s = cleanText(v);
-    const m = s.match(/[35]/);
-    return m ? Number(m[0]) : null;
+    // Önceki hâli /[35]/ herhangi bir yerde geçen tek "3" ya da "5" karakterini
+    // yakalıyordu — "13 Yıl" gibi bir metinde yanlışlıkla 3 dönüyordu. Şimdi
+    // metindeki İLK tam sayı çıkarılıp yalnızca gerçekten 3 veya 5 ise kabul edilir.
+    const m = s.match(/\d+/);
+    if (!m) return null;
+    const n = Number(m[0]);
+    return n === 3 || n === 5 ? n : null;
   }
 
   /** Kart durumu metnini normalize eder ve "aktif mi?" sorusuna bool döner. */

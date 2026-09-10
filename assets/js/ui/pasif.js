@@ -19,7 +19,7 @@
   }
 
   async function render(root, isActive = () => true) {
-    const rows = await Model.buildPivotRows();
+    const [rows, settings] = await Promise.all([Model.buildPivotRows(), Model.getSettings()]);
     if (!isActive()) return; // kullanıcı bu sırada başka bir sekmeye geçti
 
     const gruplar = Model.HAVALIMANLARI.map((h) => ({
@@ -44,7 +44,7 @@
     qsa(root, "tr[data-tc]").forEach((tr) => {
       tr.addEventListener("click", () => {
         const row = rows.find((r) => r.tc_kimlik_no === tr.dataset.tc);
-        global.Apron.detail.openPersonelDetail(row);
+        global.Apron.detail.openPersonelDetail(row, settings.uyari_esik_gun);
       });
     });
   }

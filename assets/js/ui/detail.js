@@ -11,16 +11,23 @@
   const Model = global.Apron.model;
   const icon = global.Apron.icon;
 
-  function openPersonelDetail(row) {
+  /**
+   * @param {object} row Pivot satırı.
+   * @param {number} [esikGun] Ayarlar'daki "Yaklaşıyor" uyarı eşiği (gün). Verilmezse
+   *   Model.DEFAULT_SETTINGS.uyari_esik_gun kullanılır — önceden burada hep 60 sabitti,
+   *   Ayarlar'dan eşik değiştirilince ana tablo ile detay modalı farklı durum gösterebiliyordu.
+   */
+  function openPersonelDetail(row, esikGun) {
+    const esik = esikGun || Model.DEFAULT_SETTINGS.uyari_esik_gun;
     global.Apron.modal.open({
       title: escapeHtml(row.ad_soyad),
       wide: true,
-      bodyHtml: bodyHtml(row),
+      bodyHtml: bodyHtml(row, esik),
       onRender: (bodyEl) => wire(bodyEl, row),
     });
   }
 
-  function bodyHtml(row) {
+  function bodyHtml(row, esikGun) {
     return `
       <div class="stack">
         <div class="label-list card">
@@ -39,7 +46,7 @@
 
         <div>
           <h3 class="section-title">Güvenlik Bilinci Eğitimi</h3>
-          ${egitimTable(row.egitim_kayitlari)}
+          ${egitimTable(row.egitim_kayitlari, esikGun)}
         </div>
       </div>
     `;
@@ -75,6 +82,7 @@
           ${labelRow("Başlangıç", kart.baslangic_tarihi ? N.formatDateTr(kart.baslangic_tarihi) : "—")}
           ${labelRow("Bitiş", kart.bitis_tarihi ? N.formatDateTr(kart.bitis_tarihi) : "—")}
           ${kart.pasif_aciklama ? labelRow("Pasif Açıklama", kart.pasif_aciklama) : ""}
+          ${kart.opsiyon_ham ? labelRow("Opsiyon", kart.opsiyon_ham) : ""}
           ${labelRow("Kaynak Dosya", kart.kaynak_dosya || "—")}
         </div>
         <div style="margin-top:12px">${bilgiBtn}</div>
@@ -82,7 +90,7 @@
     `;
   }
 
-  function egitimTable(kayitlar) {
+  function egitimTable(kayitlar, esikGun) {
     if (!kayitlar || !kayitlar.length) {
       return `<div class="empty-state">${icon("clock", { size: 24, className: "empty-state__icon" })}<p>Bu personel için eğitim tarihi kaydı bulunmuyor.</p></div>`;
     }
@@ -90,7 +98,7 @@
       .slice()
       .sort((a, b) => (a.bitis_tarihi < b.bitis_tarihi ? 1 : -1))
       .map((k) => {
-        const durum = Model.egitimDurumu(k, 60);
+        const durum = Model.egitimDurumu(k, esikGun);
         const cls = { Aktif: "ind--aktif", "Yaklaşıyor": "ind--yaklasiyor", "Süresi Dolmuş": "ind--dolmus", "Bilgi Yok": "ind--bilgiyok" }[durum];
         return `
           <tr>

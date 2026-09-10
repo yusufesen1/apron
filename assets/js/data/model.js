@@ -243,6 +243,15 @@
       pasif_aciklama: row.pasif_aciklama || "",
       kart_cinsi: row.kart_cinsi || "",
       acik_bolum: row.acik_bolum || "",
+      // AHL'de kart durumu/eğitim sütunu yok ama OPSIYON sütunu var — daha önce
+      // okunup hiç saklanmıyordu (sessiz veri kaybı), şimdi kaydediliyor.
+      opsiyon_ham: row.opsiyon_ham || (existing ? existing.opsiyon_ham : ""),
+      // buildPivotRows'taki personelsiz-kişi ad/soyad yedeği (fallback) bu
+      // alanları bekliyordu ama hiç doldurulmuyordu — pratikte upsertPersonelFromRow
+      // her kaynaktan çalıştığı için sorun hiç görünmüyordu, yine de burada da
+      // dolduruluyor (bkz. model.js buildPivotRows).
+      __ad: row.ad || (existing ? existing.__ad : ""),
+      __soyad: row.soyad || (existing ? existing.__soyad : ""),
       kaynak_dosya: row.__kaynak_dosya || (existing ? existing.kaynak_dosya : ""),
       import_id: importId,
       guncelleme_tarihi: N.todayIso(),

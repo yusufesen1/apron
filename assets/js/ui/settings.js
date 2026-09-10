@@ -123,7 +123,7 @@
       </div>
     `;
 
-    wire(root, settings, customKaynaklar);
+    wire(root, settings, customKaynaklar, isActive);
   }
 
   function customKaynakEditor(kaynak) {
@@ -202,7 +202,7 @@
     `;
   }
 
-  function wire(root, settings, customKaynaklar) {
+  function wire(root, settings, customKaynaklar, isActive) {
     qs(root, "#save-egitim").addEventListener("click", async () => {
       const egitim_sureleri_varsayilan = {};
       Model.HAVALIMANLARI.forEach((h) => {
@@ -290,7 +290,7 @@
 
         await Model.saveMappingProfile(next);
         global.Apron.toast.show(`${Mapping.KAYNAKLAR[kaynak].etiket} eşlemesi kaydedildi.`, { tone: "positive" });
-        render(root);
+        render(root, isActive);
       });
     });
 
@@ -299,7 +299,7 @@
         const kaynak = btn.dataset.resetProfile;
         await Model.resetMappingProfile(kaynak);
         global.Apron.toast.show(`${Mapping.KAYNAKLAR[kaynak].etiket} eşlemesi varsayılana döndürüldü.`);
-        render(root);
+        render(root, isActive);
       });
     });
 
@@ -331,7 +331,7 @@
         if (!confirm(`"${kaynak.ad}" kaynağı ve içe aktarılmış tüm verisi silinecek. Bu işlem geri alınamaz. Emin misiniz?`)) return;
         await Model.deleteCustomKaynak(kaynakId);
         global.Apron.toast.show(`"${kaynak.ad}" silindi.`, { tone: "positive" });
-        render(root);
+        render(root, isActive);
       });
     });
 

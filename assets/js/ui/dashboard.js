@@ -565,7 +565,7 @@
     qsa(tbody, "tr[data-tc]").forEach((tr) => {
       tr.addEventListener("click", () => {
         const row = rows.find((r) => r.tc_kimlik_no === tr.dataset.tc);
-        global.Apron.detail.openPersonelDetail(row);
+        global.Apron.detail.openPersonelDetail(row, currentSettings.uyari_esik_gun);
       });
     });
   }
