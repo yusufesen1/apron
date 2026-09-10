@@ -128,17 +128,24 @@
       apron_kartlari: new Map(kartList.map((k) => [k.id, k])),
       egitim_kayitlari: new Map(egitimList.map((e) => [e.id, e])),
       custom_veriler: new Map(customList.map((c) => [c.id, c])),
+      // Bir import'ta genelde 4 mağazadan hepsi değişmez (örn. AHL'de eğitim
+      // tarihi/özel alan yok) — hangi mağazanın gerçekten dokunulduğunu
+      // izleyip persistImportBatch'te yalnızca ONLARI geri yazmak, büyük
+      // şirket ölçeğinde (on binlerce kayıt) her import'ta DEĞİŞMEMİŞ
+      // mağazaları bile baştan yazmaktan kaynaklanan gereksiz yavaşlamayı önler.
+      dirty: new Set(),
     };
   }
 
-  /** createImportBatch ile alınan bağlamı, güncellenmiş haliyle tek seferde geri yazar. */
+  /** createImportBatch ile alınan bağlamı, yalnızca gerçekten değişen (dirty)
+      mağazaları tek seferde geri yazar. */
   async function persistImportBatch(batch) {
-    await Promise.all([
-      Store.setAll("personel", Array.from(batch.personel.values())),
-      Store.setAll("apron_kartlari", Array.from(batch.apron_kartlari.values())),
-      Store.setAll("egitim_kayitlari", Array.from(batch.egitim_kayitlari.values())),
-      Store.setAll("custom_veriler", Array.from(batch.custom_veriler.values())),
-    ]);
+    const yazilacaklar = [];
+    if (batch.dirty.has("personel")) yazilacaklar.push(Store.setAll("personel", Array.from(batch.personel.values())));
+    if (batch.dirty.has("apron_kartlari")) yazilacaklar.push(Store.setAll("apron_kartlari", Array.from(batch.apron_kartlari.values())));
+    if (batch.dirty.has("egitim_kayitlari")) yazilacaklar.push(Store.setAll("egitim_kayitlari", Array.from(batch.egitim_kayitlari.values())));
+    if (batch.dirty.has("custom_veriler")) yazilacaklar.push(Store.setAll("custom_veriler", Array.from(batch.custom_veriler.values())));
+    await Promise.all(yazilacaklar);
   }
 
   /** Bir özel kaynak satırını batch üzerinde upsert eder — id = kaynak_id + tc_kimlik_no. */
@@ -154,6 +161,7 @@
       guncelleme_tarihi: N.todayIso(),
     };
     batch.custom_veriler.set(id, kayit);
+    batch.dirty.add("custom_veriler");
     return kayit;
   }
 
@@ -207,6 +215,7 @@
     next.son_import_id = importId;
 
     batch.personel.set(next.tc_kimlik_no, next);
+    batch.dirty.add("personel");
     return next;
   }
 
@@ -240,6 +249,7 @@
     };
 
     batch.apron_kartlari.set(id, kart);
+    batch.dirty.add("apron_kartlari");
     return kart;
   }
 
@@ -270,6 +280,7 @@
     };
 
     batch.egitim_kayitlari.set(id, kayit);
+    batch.dirty.add("egitim_kayitlari");
     return kayit;
   }
 

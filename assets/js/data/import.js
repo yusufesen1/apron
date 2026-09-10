@@ -112,7 +112,7 @@
     };
     const importId = await Store.put("imports", importRecordDraft);
 
-    // Tüm ilgili mağazalar TEK seferde belleğe alınır; döngü boyunca localStorage'a
+    // Tüm ilgili mağazalar TEK seferde belleğe alınır; döngü boyunca veritabanına
     // dokunulmaz (bkz. model.js createImportBatch — büyük dosyalarda tarayıcının
     // kilitlenmesini/"yanıt vermiyor" uyarısını önlemek için).
     const batch = await Model.createImportBatch();

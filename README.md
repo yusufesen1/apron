@@ -166,15 +166,17 @@ Bazı kişiler kasıtlı olarak birden fazla dosyada (farklı havalimanlarında)
 
 ### 10.1 Barındırma kararı
 
-Konuşulup netleşti: sistem **tamamen tarayıcı içinde, sunucusuz** çalışıyor. Hiçbir Excel/kişi verisi ağa çıkmaz; hepsi tarayıcının **localStorage**'ında, yalnızca o bilgisayarda saklanır. SheetJS (Excel okuma/yazma) kütüphanesi de `assets/js/vendor/` altına gömülü — npm'deki eski/güvenlik açıklı sürüm yerine SheetJS'in resmi CDN'inden alınan güncel (0.20.3) sürüm kullanıldı, internet bağlantısı gerekmez.
+Konuşulup netleşti: sistem **tamamen tarayıcı içinde, sunucusuz** çalışıyor. Hiçbir Excel/kişi verisi ağa çıkmaz; hepsi tarayıcının **IndexedDB**'sinde, yalnızca o bilgisayarda saklanır. SheetJS (Excel okuma/yazma) kütüphanesi de `assets/js/vendor/` altına gömülü — npm'deki eski/güvenlik açıklı sürüm yerine SheetJS'in resmi CDN'inden alınan güncel (0.20.3) sürüm kullanıldı, internet bağlantısı gerekmez.
+
+> **Depolama tarihçesi:** Başta IndexedDB kullanılıyordu, sonra "bazı tarayıcılarda `file://` altında güvenilir çalışmıyor" endişesiyle localStorage'a geçildi. Ama localStorage'ın tarayıcı başına ~5-10 MB sınırı, gerçek ölçekli bir şirket verisinde (binlerce personel × birden fazla havalimanı × ek sütunlar — örn. 10.000 kişi ~30 MB tutuyor) hızla dolup "kayıt tamamlanamadı" hatasına yol açtı. Hedef tarayıcı (Microsoft Edge) `file://` altında IndexedDB'yi güvenilir çalıştırdığı doğrulanınca (bkz. §10.2 not) tekrar IndexedDB'ye dönüldü — kotası artık disk alanına göre yüzlerce MB - birkaç GB mertebesinde, aynı 10.000 kişilik veri kotanın ~%1,5'ini kullanıyor.
 
 ### 10.2 Çalıştırma
 
-`index.html` dosyasına çift tıklamanız yeterli — tarayıcıda doğrudan açılır, kurulum ya da sunucu gerekmez. (Önceki sürümde bir Node sunucusu vardı; IndexedDB `file://` altında bazı tarayıcılarda güvenilir çalışmadığı için gerekiyordu. Depolama katmanı localStorage'a geçirildi — o dosya://'da sorunsuz çalışıyor — ve sunucu tamamen kaldırıldı.)
+`index.html` dosyasına çift tıklamanız yeterli — tarayıcıda doğrudan açılır, kurulum ya da sunucu gerekmez. IndexedDB de localStorage gibi tamamen tarayıcı içi çalışır; `file://` üzerinden Edge'de (sayfa yenilemeden sonra veri kalıcılığı dahil) test edildi.
 
 Örnek (sahte) Excel dosyalarını yeniden üretmek isterseniz: `npm run generate-sample-data` → `sample-data/` klasörüne 5 dosya yazar (yalnızca bu adım Node gerektirir).
 
-> **Not:** localStorage tarayıcı başına ~5-10 MB ile sınırlıdır (IndexedDB'den çok daha küçük). Birkaç bin personel + kart + eğitim kaydı için yeterlidir; çok daha büyük ölçekte (on binlerce kayıt) dolabilir — o noktada Ayarlar'daki "Tüm Verileri Sıfırla" ile temizlenip yeniden içe aktarılması ya da depolamanın tekrar IndexedDB'ye çevrilmesi gerekebilir.
+> **Not:** IndexedDB kotası da sonsuz değildir (disk alanına göre değişir) — çok büyük ölçekte yine dolabilir. O noktada Ayarlar'daki "Tüm Verileri Sıfırla" ile veri temizlenip yeniden içe aktarılabilir. Ayrıca İçe Aktarma Geçmişi hiç otomatik temizlenmiyor ve satır bazlı tüm hata/uyarı metinlerini saklıyor — çok sayıda tekrarlı (test amaçlı) yükleme yapıldıysa bu da fark edilir yer tutabilir; bilinen, henüz ele alınmamış bir iyileştirme alanı.
 
 ### 10.3 Dosya yapısı
 
@@ -183,7 +185,7 @@ index.html                      Uygulama kabuğu
 assets/css/styles.css           TSS Dijital Tasarım Sistemi (bkz. §7)
 assets/js/vendor/                SheetJS (xlsx.full.min.js) — gömülü, offline
 assets/js/data/
-  db.js                          localStorage katmanı (personel, apron_kartlari,
+  db.js                          IndexedDB katmanı (personel, apron_kartlari,
                                  egitim_kayitlari, imports, settings, mapping_profiles)
   normalize.js                   Excel hücre temizleme (tarih, TC no, Türkçe metin)
   mapping-profiles.js             Kaynak başına varsayılan sütun eşlemeleri (§3.3)
