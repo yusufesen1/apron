@@ -624,7 +624,21 @@ table.data tbody tr:last-child td { border-bottom: none; }
   padding-left: 0;
 }
 .input--ghost:hover, .input--ghost:focus-visible { border-color: var(--line-strong); background: var(--surface-2); padding-left: var(--sp-3); color: var(--ink); }
-.ek-row__remove {
+
+/* Eşleştirme Profilleri — sürükle-bırak sıralanabilir, gizlenebilir/silinebilir
+   alan satırları (bkz. settings.js fieldRowHtml). */
+.map-row { align-items: center; cursor: grab; }
+.map-row.is-dragging { opacity: .35; }
+.map-row.is-hidden-field { opacity: .45; }
+.map-row.is-hidden-field:hover { opacity: .8; }
+.map-row__handle {
+  display: inline-flex;
+  flex: none;
+  color: var(--muted-2);
+  cursor: grab;
+}
+.map-row__lock { display: inline-flex; flex: none; color: var(--muted-2); padding: 4px; }
+.map-row__action {
   appearance: none;
   display: inline-flex;
   align-items: center;
@@ -639,8 +653,9 @@ table.data tbody tr:last-child td { border-bottom: none; }
   opacity: 0;
   transition: opacity var(--dur-hover) var(--ease), color var(--dur-hover) var(--ease), background var(--dur-hover) var(--ease);
 }
-.ek-row:hover .ek-row__remove { opacity: 1; }
-.ek-row__remove:hover { color: var(--red); background: var(--red-tint); }
+.map-row:hover .map-row__action, .map-row.is-hidden-field .map-row__action { opacity: 1; }
+.map-row__action:hover { color: var(--ink); background: var(--tint); }
+.map-row__action--danger:hover { color: var(--red); background: var(--red-tint); }
 
 .toolbar {
   display: flex;

@@ -75,13 +75,16 @@
    */
   async function getExtraFieldSources() {
     const [profiles, customKaynaklar] = await Promise.all([getAllMappingProfiles(), getCustomKaynaklar()]);
+    // gizli:true olan ek sütunlar (bkz. settings.js göz ikonu) "Sütun Ekle"
+    // panelinde hiç görünmesin diye burada elenir — kaydı silinmez, yalnızca
+    // Genel Bakış'ta seçilebilir olmaktan çıkar.
     const sabitKaynaklar = Object.keys(profiles)
-      .filter((k) => profiles[k].ek_alanlar && profiles[k].ek_alanlar.length)
       .map((k) => ({
         id: k,
         ad: global.Apron.mapping.KAYNAKLAR[k].etiket,
-        alanlar: profiles[k].ek_alanlar,
-      }));
+        alanlar: (profiles[k].ek_alanlar || []).filter((a) => !a.gizli),
+      }))
+      .filter((k) => k.alanlar.length);
     return sabitKaynaklar.concat(customKaynaklar);
   }
 

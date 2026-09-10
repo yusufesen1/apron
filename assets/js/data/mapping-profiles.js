@@ -25,7 +25,7 @@
   const DEFAULT_PROFILES = {
     AHL: {
       kaynak: "AHL",
-      aciklama: "İşletme, Bölüm, AD, SOYAD, KARTNO, OPSIYON, TCKİMLİKNO sütunlarını içeren AHL apron Excel'i.",
+      aciklama: "İşletme, Bölüm, AD, SOYAD, KARTNO, OPSIYON, TCKİMLİKNO, KURS-1 sütunlarını içeren AHL apron Excel'i.",
       alanlar: [
         { hedef_alan: "tc_kimlik_no", excel_sutun: "TCKİMLİKNO", zorunlu: true },
         { hedef_alan: "ad", excel_sutun: "AD", zorunlu: true },
@@ -33,17 +33,23 @@
         { hedef_alan: "baskanlik", excel_sutun: "Bölüm", zorunlu: false },
         { hedef_alan: "kart_no", excel_sutun: "KARTNO", zorunlu: false },
         { hedef_alan: "taseron_firma", excel_sutun: "İşletme", zorunlu: false },
-        { hedef_alan: "opsiyon_ham", excel_sutun: "OPSIYON", zorunlu: false },
+        { hedef_alan: "opsiyon_ham", excel_sutun: "OPSIYON", zorunlu: false, gizli: true },
         // AHL kaynağında kart durumu / eğitim tarihi sütunu yok (bkz. README §3.3 açık not).
-        { hedef_alan: "kart_durumu", excel_sutun: "", zorunlu: false },
-        { hedef_alan: "baslangic_tarihi", excel_sutun: "", zorunlu: false },
-        { hedef_alan: "bitis_tarihi", excel_sutun: "", zorunlu: false },
-        { hedef_alan: "egitim_tarihi", excel_sutun: "", zorunlu: false },
-        { hedef_alan: "gecerlilik_yili", excel_sutun: "", zorunlu: false },
+        { hedef_alan: "kart_durumu", excel_sutun: "", zorunlu: false, gizli: true },
+        { hedef_alan: "baslangic_tarihi", excel_sutun: "", zorunlu: false, gizli: true },
+        { hedef_alan: "bitis_tarihi", excel_sutun: "", zorunlu: false, gizli: true },
+        { hedef_alan: "egitim_tarihi", excel_sutun: "", zorunlu: false, gizli: true },
+        { hedef_alan: "gecerlilik_yili", excel_sutun: "", zorunlu: false, gizli: true },
       ],
       // Ayarlar > Eşleştirme Profilleri'nden eklenen, sabit şemada karşılığı
       // olmayan ek sütunlar (bkz. README §6). TC Kimlik No ile kişiye bağlanır.
-      ek_alanlar: [],
+      ek_alanlar: [{ key: "kurs_1", excel_sutun: "KURS-1", etiket: "Kurs-1" }],
+      // Ayarlar > Eşleştirme Profilleri ekranında satırların gösterim sırası
+      // (sürükle-bırak ile kullanıcı tarafından değiştirilebilir). "ek:<key>"
+      // ek sütunu, düz "<hedef_alan>" sabit alanı işaret eder. gizli:true olan
+      // alanlar (opsiyon_ham, kart_durumu vb.) kaybolmaz — soluk/gizli olarak
+      // listenin sonunda görünür, göz ikonuyla tekrar açılabilir (bkz. settings.js).
+      siralama: ["taseron_firma", "baskanlik", "ad", "soyad", "kart_no", "tc_kimlik_no", "ek:kurs_1"],
     },
 
     IGA_AO: {
@@ -106,9 +112,9 @@
         { hedef_alan: "acik_bolum", excel_sutun: "Açık Bölüm", zorunlu: false },
         { hedef_alan: "kart_durumu", excel_sutun: "Kart Durum", zorunlu: false },
         { hedef_alan: "baslangic_tarihi", excel_sutun: "Müracaat Tarihi", zorunlu: false },
-        { hedef_alan: "bitis_tarihi", excel_sutun: "", zorunlu: false },
+        { hedef_alan: "bitis_tarihi", excel_sutun: "", zorunlu: false, gizli: true },
         { hedef_alan: "egitim_tarihi", excel_sutun: "Eğitim Tarihi", zorunlu: false },
-        { hedef_alan: "gecerlilik_yili", excel_sutun: "Dönemi", zorunlu: false },
+        { hedef_alan: "gecerlilik_yili", excel_sutun: "Dönemi", zorunlu: false, gizli: true },
         { hedef_alan: "kart_cinsi", excel_sutun: "Kartın Cinsi", zorunlu: false },
       ],
       // "Sıra No" (satır sırası, kişiye özgü anlamlı bilgi değil) ve "Ad Soyad"
@@ -127,6 +133,15 @@
         { key: "mur_durum", excel_sutun: "Mur Durum", etiket: "Mur Durum" },
         { key: "kab_tarih", excel_sutun: "KAB Tarih", etiket: "KAB Tarih" },
         { key: "randevu_tarihi", excel_sutun: "Randevu Tarihi", etiket: "Randevu Tarihi" },
+      ],
+      // Ayarlar > Eşleştirme Profilleri ekranında satırların gösterim sırası
+      // (sürükle-bırak ile kullanıcı tarafından değiştirilebilir). gizli:true
+      // olan alanlar (bitis_tarihi, gecerlilik_yili "Dönemi") kaybolmaz —
+      // soluk/gizli olarak listenin sonunda görünür (bkz. settings.js).
+      siralama: [
+        "tc_kimlik_no", "ad", "soyad", "unvan", "baskanlik", "acik_bolum", "egitim_tarihi", "kart_cinsi",
+        "ek:muracaat_tipi", "baslangic_tarihi", "ek:teslim_tarihi", "ek:iade_tarihi", "ek:kayip_bild_tarihi",
+        "ek:son_tarih", "ek:egitim_kurs_1", "ek:mur_durum", "kart_durumu", "ek:kab_tarih", "ek:randevu_tarihi",
       ],
     },
 

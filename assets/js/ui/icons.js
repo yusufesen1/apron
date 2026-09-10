@@ -28,6 +28,10 @@
     chevronDown: '<path d="M6 9l6 6 6-6"/>',
     plus: '<path d="M12 5v14"/><path d="M5 12h14"/>',
     filter: '<polygon points="21 4 3 4 10 12.46 10 19 14 21 14 12.46 21 4"/>',
+    grip: '<circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/>',
+    eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>',
+    eyeOff: '<path d="M3 3l18 18"/><path d="M10.6 5.2A10.8 10.8 0 0 1 12 5c6.5 0 10 7 10 7a17.7 17.7 0 0 1-3.4 4.4M6.6 6.6C3.8 8.3 2 12 2 12s3.5 7 10 7a9.9 9.9 0 0 0 4.4-1"/><path d="M9.5 9.5a3 3 0 0 0 4.2 4.2"/>',
+    lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
   };
 
   function icon(name, { size = 16, className = "" } = {}) {
