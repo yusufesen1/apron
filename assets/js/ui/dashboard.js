@@ -123,10 +123,10 @@
 
         <div class="filter-bar" id="dash-filters">
           <div class="field field--grow">
-            <label class="field__label" for="f-q">Ara</label>
+            <label class="field__label" for="f-q">Filtrele</label>
             <div class="search-field">
               ${icon("search", { size: 16, className: "search-field__icon" })}
-              <input class="input" id="f-q" type="text" placeholder="TC Kimlik No veya Ad Soyad" />
+              <input class="input" id="f-q" type="text" placeholder="TC Kimlik No, Ad Soyad, Unvan veya Başkanlık" />
             </div>
           </div>
         </div>
@@ -404,7 +404,7 @@
   function filteredRows() {
     const rows = allRows.filter((r) => {
       if (filters.q) {
-        const hay = `${r.sicil} ${r.ad_soyad} ${r.tc_kimlik_no}`.toLocaleLowerCase("tr-TR");
+        const hay = `${r.sicil} ${r.ad_soyad} ${r.tc_kimlik_no} ${r.unvan} ${r.baskanlik}`.toLocaleLowerCase("tr-TR");
         if (!hay.includes(filters.q)) return false;
       }
       if (filters.baskanlik.length && !filters.baskanlik.includes(r.baskanlik)) return false;
