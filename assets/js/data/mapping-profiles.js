@@ -31,14 +31,15 @@
         { hedef_alan: "soyad", excel_sutun: "SOYAD", zorunlu: true },
         // DÜZELTME (kullanıcı geri bildirimi, gerçek Excel örneğiyle): AHL'de
         // "Bölüm" aslında UNVAN taşıyor (Uzman, Stajyer, Uzman Yardımcısı...),
-        // Başkanlık diye ayrı bir sütun yok. "KARTNO" da apron kart no değil,
-        // SİCİL NO. Eskiden bu ikisi ters eşleniyordu (Bölüm→Başkanlık,
-        // KARTNO→Kart No) — bkz. model.js ESKI_HATALI_ESLEMELER (kayıtlı eski
-        // profillerde de otomatik düzeltilir).
+        // Başkanlık diye ayrı bir sütun yok — bkz. model.js ESKI_HATALI_ESLEMELER
+        // (kayıtlı eski profillerde de otomatik düzeltilir).
+        // DÜZELTME 2 (kullanıcı geri bildirimi, 11.09.2026): "KARTNO" sütunu
+        // Sicil No değil, apron KART NO'sunun kendisiymiş — önceki düzeltmede
+        // bu ters eşleniyordu (KARTNO→sicil). AHL'de ayrı bir sicil bilgisi yok.
         { hedef_alan: "unvan", excel_sutun: "Bölüm", zorunlu: false },
-        { hedef_alan: "sicil", excel_sutun: "KARTNO", zorunlu: false },
+        { hedef_alan: "sicil", excel_sutun: "", zorunlu: false, gizli: true },
         { hedef_alan: "baskanlik", excel_sutun: "", zorunlu: false, gizli: true },
-        { hedef_alan: "kart_no", excel_sutun: "", zorunlu: false, gizli: true },
+        { hedef_alan: "kart_no", excel_sutun: "KARTNO", zorunlu: false },
         { hedef_alan: "taseron_firma", excel_sutun: "İşletme", zorunlu: false },
         { hedef_alan: "opsiyon_ham", excel_sutun: "OPSIYON", zorunlu: false, gizli: true },
         { hedef_alan: "kart_durumu", excel_sutun: "", zorunlu: false, gizli: true },
@@ -58,7 +59,7 @@
       // ek sütunu, düz "<hedef_alan>" sabit alanı işaret eder. gizli:true olan
       // alanlar (opsiyon_ham, kart_durumu vb.) kaybolmaz — soluk/gizli olarak
       // listenin sonunda görünür, göz ikonuyla tekrar açılabilir (bkz. settings.js).
-      siralama: ["taseron_firma", "unvan", "ad", "soyad", "sicil", "tc_kimlik_no", "egitim_bitis_tarihi_dogrudan"],
+      siralama: ["taseron_firma", "unvan", "ad", "soyad", "kart_no", "tc_kimlik_no", "egitim_bitis_tarihi_dogrudan"],
     },
 
     IGA_AO: {

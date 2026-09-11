@@ -50,10 +50,15 @@
    */
   const ESKI_HATALI_ESLEMELER = {
     AHL: {
-      // "Bölüm" aslında Unvan taşıyor, Başkanlık AHL'de yok; "KARTNO" apron
-      // kart no değil Sicil No (bkz. kullanıcı geri bildirimi).
+      // "Bölüm" aslında Unvan taşıyor, Başkanlık AHL'de yok.
       baskanlik: "Bölüm",
-      kart_no: "KARTNO",
+      // DÜZELTME 2 (kullanıcı geri bildirimi, 11.09.2026): "KARTNO" aslında
+      // Sicil No değil, apron kart no'nun kendisiymiş — önceki düzeltme
+      // (KARTNO'yu sicil'e eşleme, kart_no'yu boş bırakma) yanlış çıktı.
+      // Hem o yanlış sicil eşlemesi hem de bu yüzden boş kalan kart_no,
+      // kayıtlı eski profillerde otomatik olarak yeni varsayılana çevrilir.
+      sicil: "KARTNO",
+      kart_no: "",
     },
     IGA_AO: {
       // "Bitiş Tarihi" kişiye özgü olmayan sabit bir idari tarihti; gerçek
