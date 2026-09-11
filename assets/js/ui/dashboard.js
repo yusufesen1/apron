@@ -87,6 +87,22 @@
   // Kalıcı hali settings.secili_sutunlar'da tutulur, bu sadece render arası çalışma kopyası.
   let activeColumns = [];
 
+  // Sayfalama: ~10.000 personel ölçeğinde filtrelenen satırların TAMAMINI tek
+  // seferde DOM'a basmak (innerHTML) gözle görülür bir yavaşlığa yol açıyordu.
+  // Filtre/arama her zaman TÜM listede çalışır (bkz. filteredRows) — sayfalama
+  // yalnızca o sonucun kaç satırının aynı anda DOM'a yazılacağını sınırlar.
+  const PAGE_SIZE = 100;
+  let currentPage = 1;
+  // Son hesaplanan (filtrelenmiş + sıralanmış) satır listesi — sayfa
+  // ileri/geri ve "Sütun Ekle/Kaldır" gibi filtre sonucunu DEĞİŞTİRMEYEN
+  // işlemlerde filteredRows()'u gereksiz yere tekrar çalıştırmamak için
+  // önbelleğe alınır (bkz. refreshView).
+  let lastFilteredRows = [];
+
+  function totalPageCount(rowCount) {
+    return Math.max(1, Math.ceil(rowCount / PAGE_SIZE));
+  }
+
   // Güvenlik Bilinci Eğitimi artık TEK bir "en iyimser kazanır" sütun değil,
   // havalimanı başına AYRI bir sütun olarak gösteriliyor — bir kaynakta
   // süresi dolmuş bir eğitim artık başka bir kaynağın uzak tarihinin
@@ -226,6 +242,7 @@
             <tbody id="dash-tbody"></tbody>
           </table>
         </div>
+        <div id="dash-pagination"></div>
       </div>
     `;
 
@@ -245,8 +262,23 @@
     setupColumnPicker(root, isActive);
     wireFilters(root, isActive);
     renderTableHead(root, isActive);
-    renderStats(root);
-    renderTable(root);
+    // Sayfa numarası sekmeler arası geçişte de (filtreler/sıralama gibi)
+    // korunur — yalnızca filtre/arama/sıralama DEĞİŞTİĞİNDE 1. sayfaya dönülür.
+    refreshView(root, isActive, { resetPage: false });
+  }
+
+  /**
+   * Filtre+sıralama sonucunu TEK seferde hesaplayıp (bkz. filteredRows)
+   * hem istatistik panellerine hem tabloya aktarır — önceden ikisi ayrı
+   * ayrı filteredRows() çağırıp aynı işi iki kez yapıyordu.
+   */
+  function refreshView(root, isActive, { resetPage = true } = {}) {
+    if (!isActive()) return;
+    if (resetPage) currentPage = 1;
+    const rows = filteredRows();
+    lastFilteredRows = rows;
+    renderStats(root, rows);
+    renderTable(root, rows, isActive);
   }
 
   function distinctValues(field) {
@@ -255,11 +287,7 @@
 
   /** Sütun başlığındaki huniye tıklayınca açılan, o sütuna özel filtre menüsünü kurar. */
   function setupColumnFilters(root, isActive) {
-    const refresh = () => {
-      if (!isActive()) return;
-      renderStats(root);
-      renderTable(root);
-    };
+    const refresh = () => refreshView(root, isActive, { resetPage: true });
 
     columnFilterMs = {};
 
@@ -358,7 +386,9 @@
         activeColumns = keys;
         Model.saveSettings({ secili_sutunlar: keys });
         renderTableHead(root, isActive);
-        renderTable(root);
+        // Sütun ekleme/kaldırma filtre sonucunu değiştirmez — filteredRows()'u
+        // tekrar hesaplamadan önbellekteki son sonuç yeniden çizilir.
+        renderTable(root, lastFilteredRows, isActive);
       },
     });
     qs(root, "#col-picker-mount").appendChild(columnsMs.el);
@@ -371,15 +401,11 @@
     if (columnsMs) columnsMs.setSelected(activeColumns);
     Model.saveSettings({ secili_sutunlar: activeColumns });
     renderTableHead(root, isActive);
-    renderTable(root);
+    renderTable(root, lastFilteredRows, isActive);
   }
 
   function wireFilters(root, isActive) {
-    const refresh = () => {
-      if (!isActive()) return;
-      renderStats(root);
-      renderTable(root);
-    };
+    const refresh = () => refreshView(root, isActive, { resetPage: true });
     qs(root, "#f-q").value = filters.q;
     qs(root, "#f-q").addEventListener(
       "input",
@@ -445,7 +471,7 @@
           sortState.dir = "asc";
         }
         updateSortIndicators(root);
-        renderTable(root);
+        refreshView(root, isActive, { resetPage: true });
       });
     });
     qsa(root, "[data-remove-col]").forEach((btn) => {
@@ -530,8 +556,7 @@
     return rows;
   }
 
-  function renderStats(root) {
-    const rows = filteredRows();
+  function renderStats(root, rows) {
     const yaklasiyor = rows.filter((r) => r.egitim_durumu === "Yaklaşıyor").length;
     const dolmus = rows.filter((r) => r.egitim_durumu === "Süresi Dolmuş").length;
     const ahl = rows.filter((r) => r.havalimani_var.AHL).length;
@@ -633,19 +658,35 @@
     `;
   }
 
-  function renderTable(root) {
-    const rows = filteredRows();
+  /**
+   * @param {object[]} rows - filteredRows() sonucu (TÜM filtrelenmiş+sıralanmış
+   *   kayıtlar, sayfa başına bölünmeden önceki hali). Sayfalama SADECE burada,
+   *   DOM'a yazılacak dilimi seçerken uygulanır — filtre/arama her zaman bu
+   *   tam listeyi kapsar (bkz. filteredRows, refreshView).
+   */
+  function renderTable(root, rows, isActive) {
     const tbody = qs(root, "#dash-tbody");
     const optCols = activeColumns.map(optionalColumnByKey).filter(Boolean);
     qs(root, "#dash-count").textContent = `${N.formatNumberTr(rows.length)} kayıt`;
     updateClearFiltersVisibility(root);
 
+    const pages = totalPageCount(rows.length);
+    if (currentPage > pages) currentPage = pages;
+    if (currentPage < 1) currentPage = 1;
+
     if (!rows.length) {
       tbody.innerHTML = `<tr><td colspan="${8 + EGITIM_SUTUNLARI.length + optCols.length}"><div class="table-empty">Filtrelere uyan kayıt bulunamadı.</div></td></tr>`;
+      renderPagination(root, rows, isActive);
       return;
     }
 
-    tbody.innerHTML = rows
+    // Yalnızca o an görünen sayfadaki (en fazla PAGE_SIZE) satır DOM'a
+    // yazılır — 10.000 kayıtlık bir filtre sonucunda bile innerHTML her
+    // zaman en fazla PAGE_SIZE <tr> üretir.
+    const start = (currentPage - 1) * PAGE_SIZE;
+    const pageRows = rows.slice(start, start + PAGE_SIZE);
+
+    tbody.innerHTML = pageRows
       .map(
         (r) => `
       <tr data-tc="${escapeHtml(r.tc_kimlik_no)}">
@@ -666,9 +707,49 @@
 
     qsa(tbody, "tr[data-tc]").forEach((tr) => {
       tr.addEventListener("click", () => {
-        const row = rows.find((r) => r.tc_kimlik_no === tr.dataset.tc);
+        const row = pageRows.find((r) => r.tc_kimlik_no === tr.dataset.tc);
         global.Apron.detail.openPersonelDetail(row, currentSettings.uyari_esik_gun);
       });
+    });
+
+    renderPagination(root, rows, isActive);
+  }
+
+  /** Tablonun altındaki "Önceki / Sonraki" sayfalama çubuğu. Sayfa değişimi
+      filtre sonucunu YENİDEN HESAPLAMAZ — aynı `rows` dilimlenerek yeniden çizilir. */
+  function renderPagination(root, rows, isActive) {
+    const mount = qs(root, "#dash-pagination");
+    if (!mount) return;
+
+    if (rows.length <= PAGE_SIZE) {
+      mount.innerHTML = "";
+      return;
+    }
+
+    const pages = totalPageCount(rows.length);
+    const start = (currentPage - 1) * PAGE_SIZE + 1;
+    const end = Math.min(currentPage * PAGE_SIZE, rows.length);
+
+    mount.innerHTML = `
+      <div class="pagination">
+        <span class="pagination__info">${N.formatNumberTr(start)}–${N.formatNumberTr(end)} / ${N.formatNumberTr(rows.length)} kayıt</span>
+        <div class="pagination__nav">
+          <button type="button" class="btn btn--ghost btn--sm" id="page-prev" ${currentPage <= 1 ? "disabled" : ""}>${icon("chevron", { size: 13, className: "btn__icon icon-flip" })}Önceki</button>
+          <span class="pagination__page">Sayfa ${currentPage} / ${pages}</span>
+          <button type="button" class="btn btn--ghost btn--sm" id="page-next" ${currentPage >= pages ? "disabled" : ""}>Sonraki${icon("chevron", { size: 13, className: "btn__icon" })}</button>
+        </div>
+      </div>
+    `;
+
+    qs(root, "#page-prev").addEventListener("click", () => {
+      if (!isActive() || currentPage <= 1) return;
+      currentPage -= 1;
+      renderTable(root, rows, isActive);
+    });
+    qs(root, "#page-next").addEventListener("click", () => {
+      if (!isActive() || currentPage >= pages) return;
+      currentPage += 1;
+      renderTable(root, rows, isActive);
     });
   }
 
@@ -696,7 +777,10 @@
   }
 
   function exportCurrentView(root) {
-    const rows = filteredRows();
+    // Sayfalamadan BAĞIMSIZ: o an ekrandaki sayfa ne olursa olsun, filtreye
+    // uyan TÜM kayıtlar aktarılır (bkz. refreshView — lastFilteredRows her
+    // filtre/sıralama değişiminde güncel tutulur, burada tekrar hesaplanmaz).
+    const rows = lastFilteredRows;
     // Ekranda o an görünen isteğe bağlı sütunlar da dahil edilir (WYSIWYG).
     const optCols = activeColumns.map(optionalColumnByKey).filter(Boolean);
     const header = [

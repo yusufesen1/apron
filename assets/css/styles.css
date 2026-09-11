@@ -548,6 +548,22 @@ table.data tbody tr:last-child td { border-bottom: none; }
   font-size: 13px;
 }
 
+/* Sayfalama — 10.000+ personel ölçeğinde tablonun tamamını tek seferde DOM'a
+   basmamak için (bkz. dashboard.js renderTable/renderPagination). Filtre
+   sonucu PAGE_SIZE'ı aşmıyorsa çubuk hiç render edilmez. */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+  margin-top: var(--sp-3);
+}
+.pagination__info { font-size: 12px; color: var(--muted); }
+.pagination__nav { display: flex; align-items: center; gap: var(--sp-2); }
+.pagination__page { font-size: 12px; font-weight: 700; color: var(--ink); white-space: nowrap; }
+.icon-flip { transform: scaleX(-1); }
+
 /* VAR/YOK matrisi — havalimanı sütunları. VAR öne çıkar (dolu yeşil daire),
    YOK geri çekilir (sade tire) — üç sütun tekrar ettiğinde pil rozetlerden
    daha sakin ve hizalı bir tablo verir. */
