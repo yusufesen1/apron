@@ -1,6 +1,9 @@
 /* ============================================================
    dashboard.js — Genel Bakış (README §3.1 "LAZIM OLAN").
-   TC KİMLİK NO | AD SOYAD | UNVAN | BAŞKANLIK | AHL | İGA | İGA TTAŞ | HEAŞ | GÜV. BİL. SER.
+   SİCİL | TC KİMLİK NO | AD SOYAD | UNVAN | BAŞKANLIK | AHL | İGA | HEAŞ |
+   AHL Eğitimi | İGA Eğitimi | HEAŞ Eğitimi (her biri kendi durum+tarihiyle —
+   bkz. model.js egitim_by_havalimani/egitim_durumu_by_havalimani; kasıtlı
+   olarak TEK bir "en iyimser kazanır" sütuna indirgenmiyor).
    ============================================================ */
 (function (global) {
   "use strict";
@@ -13,11 +16,64 @@
   let allRows = [];
   let currentSettings = Model.DEFAULT_SETTINGS;
 
+  // Sicil/TC Kimlik No/Ad Soyad/Unvan/Başkanlık sütunlarının hepsi aynı
+  // şekilde filtrelenir: başlıktaki huniye tıklayınca aranabilir, çoklu
+  // seçimli bir liste açılır (bkz. setupColumnFilters, filteredRows).
+  const METIN_FILTRE_ALANLARI = ["sicil", "tc_kimlik_no", "ad_soyad", "unvan", "baskanlik"];
+  const METIN_FILTRE_ARAMA_PLACEHOLDER = {
+    sicil: "Sicil ara…",
+    tc_kimlik_no: "TC Kimlik No ara…",
+    ad_soyad: "Ad Soyad ara…",
+    unvan: "Unvan ara…",
+    baskanlik: "Başkanlık ara…",
+  };
+
+  /**
+   * Hazır tek-tık filtre çipleri. Sütun huni filtreleri her zaman kendi
+   * aralarında VE (AND) birleşir — bu yeterli olduğunda (örn. "3
+   * havalimanında da kartı VAR" için üç huniyi VAR'a çekmek) ayrı bir çip
+   * gerekmez. Çipler asıl, huni filtreleriyle İFADE EDİLEMEYEN "HERHANGİ
+   * bir havalimanında X" (VEYA/OR) türü sorgular için var — bkz. kullanıcı
+   * talebi. Birden çok çip aynı anda seçilebilir, aralarında yine VE
+   * mantığıyla birleşir (bkz. filteredRows).
+   */
+  const QUICK_FILTER_CHIPS = [
+    {
+      key: "uc_havalimani_kart",
+      label: "3 Havalimanında da Kartı Var",
+      test: (r) => Model.HAVALIMANLARI.every((h) => r.havalimani_var[h]),
+    },
+    {
+      key: "herhangi_egitim_dolmus",
+      label: "Herhangi Bir Yerde Eğitim Süresi Dolmuş",
+      test: (r) => Model.HAVALIMANLARI.some((h) => r.egitim_durumu_by_havalimani[h] === "Süresi Dolmuş"),
+    },
+    {
+      key: "herhangi_egitim_yaklasiyor",
+      label: "Yaklaşan Eğitimi Var",
+      test: (r) => Model.HAVALIMANLARI.some((h) => r.egitim_durumu_by_havalimani[h] === "Yaklaşıyor"),
+    },
+    {
+      key: "kart_var_egitim_sorunlu",
+      label: "Kartı Var, Eğitimi Sorunlu (Dolmuş/Eksik)",
+      test: (r) =>
+        Model.HAVALIMANLARI.some(
+          (h) => r.havalimani_var[h] && (r.egitim_durumu_by_havalimani[h] === "Süresi Dolmuş" || r.egitim_durumu_by_havalimani[h] === "Bilgi Yok")
+        ),
+    },
+  ];
+
   /** Havalimanı başına "" | "VAR" | "YOK" tutan varsayılan filtre nesnesi üretir. */
   function defaultFilters() {
     const havalimaniDurum = {};
-    Model.HAVALIMANLARI.forEach((h) => (havalimaniDurum[h] = ""));
-    return { q: "", baskanlik: [], unvan: [], havalimaniDurum, egitimDurumu: "" };
+    const egitimDurumuByHavalimani = {};
+    Model.HAVALIMANLARI.forEach((h) => {
+      havalimaniDurum[h] = "";
+      egitimDurumuByHavalimani[h] = "";
+    });
+    const f = { q: "", havalimaniDurum, egitimDurumuByHavalimani, chips: new Set() };
+    METIN_FILTRE_ALANLARI.forEach((k) => (f[k] = []));
+    return f;
   }
 
   let filters = defaultFilters();
@@ -31,17 +87,30 @@
   // Kalıcı hali settings.secili_sutunlar'da tutulur, bu sadece render arası çalışma kopyası.
   let activeColumns = [];
 
+  // Güvenlik Bilinci Eğitimi artık TEK bir "en iyimser kazanır" sütun değil,
+  // havalimanı başına AYRI bir sütun olarak gösteriliyor — bir kaynakta
+  // süresi dolmuş bir eğitim artık başka bir kaynağın uzak tarihinin
+  // arkasında gizlenmiyor (bkz. oturum notları / kullanıcı talebi: Yavuz
+  // Kalafat örneği). Her sütunun anahtarı "egitim_<HAVALİMANI>".
+  const EGITIM_SUTUNLARI = Model.HAVALIMANLARI.map((h) => ({
+    key: `egitim_${h}`,
+    havalimani: h,
+    label: `${Model.HAVALIMANI_ETIKET[h]} Eğitimi`,
+    filter: `egitim_${h}`,
+    filterAlign: "right",
+    dotClass: { AHL: "airport-dot--ahl", IGA_AO: "airport-dot--iga", HEAS: "airport-dot--heas" }[h],
+  }));
+
   const SORT_COLUMNS = [
-    { key: "tc_kimlik_no", label: "TC Kimlik No" },
-    { key: "ad_soyad", label: "Ad Soyad" },
+    { key: "sicil", label: "Sicil", filter: "sicil" },
+    { key: "tc_kimlik_no", label: "TC Kimlik No", filter: "tc_kimlik_no" },
+    { key: "ad_soyad", label: "Ad Soyad", filter: "ad_soyad" },
     { key: "unvan", label: "Unvan", filter: "unvan" },
     { key: "baskanlik", label: "Başkanlık", filter: "baskanlik", filterAlign: "left" },
     { key: "AHL", label: "AHL", filter: "AHL", filterAlign: "right" },
     { key: "IGA_AO", label: "İGA", filter: "IGA_AO", filterAlign: "right" },
-    { key: "IGA_TTAS", label: "İGA TTAŞ", filter: "IGA_TTAS", filterAlign: "right" },
     { key: "HEAS", label: "HEAŞ", filter: "HEAS", filterAlign: "right" },
-    { key: "egitim", label: "Güv. Bil. Eğitimi", filter: "egitim", filterAlign: "right" },
-    { key: "egitim", label: "Tarih" },
+    ...EGITIM_SUTUNLARI,
   ];
 
   const MAX_OPTIONAL_COLUMNS = 5;
@@ -55,8 +124,18 @@
     return iso ? N.formatDateTr(iso) : "—";
   }
 
+  // Kullanıcı talebi: Genel Bakış tablosunun İÇERİĞİ (isim soyisim, unvan,
+  // başkanlık, eğitim durum yazıları vb.) ekranda büyük harfle gösterilsin.
+  // Türkçe İ/ı ayrımı doğru olsun diye normalize.js'teki turkishUpper
+  // kullanılır — düz .toUpperCase() "yıl" gibi kelimeleri "YıL" yapardı.
+  // Yalnızca GÖRÜNÜM için uygulanır; satırın kendi verisi (sıralama, filtre
+  // eşleştirmesi, dışa aktarım) orijinal (karışık) haliyle kalır.
+  function up(v) {
+    return N.turkishUpper(v);
+  }
+
   function taseronValue(r) {
-    return kartAlan(r, "AHL", "taseron_firma") || kartAlan(r, "IGA_AO", "taseron_firma") || kartAlan(r, "IGA_TTAS", "taseron_firma");
+    return kartAlan(r, "AHL", "taseron_firma") || kartAlan(r, "IGA_AO", "taseron_firma");
   }
 
   function kaynakDosyaValue(r) {
@@ -70,18 +149,14 @@
 
   /** "Sütun Ekle" panelinde seçilebilecek, varsayılan tabloda gösterilmeyen sabit ek sütunlar. */
   const BUILTIN_OPTIONAL_COLUMNS = [
-    { key: "opt_sicil", label: "Sicil", get: (r) => r.sicil || "—", sortVal: (r) => r.sicil || "" },
     { key: "opt_ahl_kartno", label: "AHL Kart No", get: (r) => kartAlan(r, "AHL", "kart_no") || "—", sortVal: (r) => kartAlan(r, "AHL", "kart_no") },
     { key: "opt_iga_kartno", label: "İGA Kart No", get: (r) => kartAlan(r, "IGA_AO", "kart_no") || "—", sortVal: (r) => kartAlan(r, "IGA_AO", "kart_no") },
-    { key: "opt_igattas_kartno", label: "İGA TTAŞ Kart No", get: (r) => kartAlan(r, "IGA_TTAS", "kart_no") || "—", sortVal: (r) => kartAlan(r, "IGA_TTAS", "kart_no") },
     { key: "opt_heas_kartno", label: "HEAŞ Kart No", get: (r) => kartAlan(r, "HEAS", "kart_no") || "—", sortVal: (r) => kartAlan(r, "HEAS", "kart_no") },
     { key: "opt_ahl_baslangic", label: "AHL Kart Başlangıç", get: (r) => tarihGoster(kartAlan(r, "AHL", "baslangic_tarihi")), sortVal: (r) => kartAlan(r, "AHL", "baslangic_tarihi") },
     { key: "opt_iga_baslangic", label: "İGA Kart Başlangıç", get: (r) => tarihGoster(kartAlan(r, "IGA_AO", "baslangic_tarihi")), sortVal: (r) => kartAlan(r, "IGA_AO", "baslangic_tarihi") },
-    { key: "opt_igattas_baslangic", label: "İGA TTAŞ Kart Başlangıç", get: (r) => tarihGoster(kartAlan(r, "IGA_TTAS", "baslangic_tarihi")), sortVal: (r) => kartAlan(r, "IGA_TTAS", "baslangic_tarihi") },
     { key: "opt_heas_baslangic", label: "HEAŞ Kart Başlangıç", get: (r) => tarihGoster(kartAlan(r, "HEAS", "baslangic_tarihi")), sortVal: (r) => kartAlan(r, "HEAS", "baslangic_tarihi") },
     { key: "opt_ahl_bitis", label: "AHL Kart Bitiş", get: (r) => tarihGoster(kartAlan(r, "AHL", "bitis_tarihi")), sortVal: (r) => kartAlan(r, "AHL", "bitis_tarihi") },
     { key: "opt_iga_bitis", label: "İGA Kart Bitiş", get: (r) => tarihGoster(kartAlan(r, "IGA_AO", "bitis_tarihi")), sortVal: (r) => kartAlan(r, "IGA_AO", "bitis_tarihi") },
-    { key: "opt_igattas_bitis", label: "İGA TTAŞ Kart Bitiş", get: (r) => tarihGoster(kartAlan(r, "IGA_TTAS", "bitis_tarihi")), sortVal: (r) => kartAlan(r, "IGA_TTAS", "bitis_tarihi") },
     { key: "opt_heas_bitis", label: "HEAŞ Kart Bitiş", get: (r) => tarihGoster(kartAlan(r, "HEAS", "bitis_tarihi")), sortVal: (r) => kartAlan(r, "HEAS", "bitis_tarihi") },
     { key: "opt_taseron", label: "Taşeron Firma", get: (r) => taseronValue(r) || "—", sortVal: (r) => taseronValue(r) },
     {
@@ -121,24 +196,25 @@
       <div class="page">
         <div class="stat-panels" id="dash-stats"></div>
 
+        <div class="table-toolbar">
+          <span class="table-toolbar__count" id="dash-count"></span>
+          <div class="row" style="gap:8px">
+            <div id="col-picker-mount"></div>
+            <button type="button" class="btn btn--accent" id="dash-export">${icon("download", { size: 14, className: "btn__icon" })}Excel'e Aktar</button>
+          </div>
+        </div>
+
         <div class="filter-bar" id="dash-filters">
           <div class="field field--grow">
             <label class="field__label" for="f-q">Filtrele</label>
             <div class="search-field">
               ${icon("search", { size: 16, className: "search-field__icon" })}
               <input class="input" id="f-q" type="text" placeholder="TC Kimlik No, Ad Soyad, Unvan veya Başkanlık" />
+              <button type="button" class="btn btn--ghost btn--sm search-field__clear" id="f-clear" hidden>${icon("close", { size: 12, className: "btn__icon" })}Filtreleri Temizle</button>
             </div>
           </div>
-        </div>
-
-        <div class="table-toolbar">
-          <div class="row" style="gap:12px">
-            <span class="table-toolbar__count" id="dash-count"></span>
-            <button type="button" class="btn btn--ghost btn--sm" id="f-clear" hidden>Filtreleri Temizle</button>
-          </div>
-          <div class="row" style="gap:8px">
-            <div id="col-picker-mount"></div>
-            <button type="button" class="btn btn--sm" id="dash-export">${icon("download", { size: 14, className: "btn__icon" })}Excel'e Aktar</button>
+          <div class="quick-filters" role="group" aria-label="Hazır filtreler">
+            ${QUICK_FILTER_CHIPS.map((c) => `<button type="button" class="quick-filter-chip" data-chip="${c.key}">${escapeHtml(c.label)}</button>`).join("")}
           </div>
         </div>
 
@@ -159,6 +235,13 @@
     currentSettings = settings;
     allOptionalColumns = BUILTIN_OPTIONAL_COLUMNS.concat(buildCustomColumns(extraFieldSources));
     activeColumns = (settings.secili_sutunlar || []).filter((k) => optionalColumnByKey(k));
+    // Kullanıcı talebi: "Taşeron Firma" artık varsayılan görünümde YOK sayılsın
+    // — daha önce "Sütun Ekle" ile eklenip kaydedilmiş olsa bile bir kerelik
+    // otomatik kaldırılır. Kullanıcı isterse aynı panelden yine ekleyebilir.
+    if (activeColumns.includes("opt_taseron")) {
+      activeColumns = activeColumns.filter((k) => k !== "opt_taseron");
+      Model.saveSettings({ secili_sutunlar: activeColumns });
+    }
     setupColumnPicker(root, isActive);
     wireFilters(root, isActive);
     renderTableHead(root, isActive);
@@ -167,7 +250,7 @@
   }
 
   function distinctValues(field) {
-    return Array.from(new Set(allRows.map((r) => r[field]).filter(Boolean))).sort((a, b) => a.localeCompare(b, "tr"));
+    return Array.from(new Set(allRows.map((r) => r[field]).filter(Boolean))).sort((a, b) => a.localeCompare(b, "tr", { numeric: true }));
   }
 
   /** Sütun başlığındaki huniye tıklayınca açılan, o sütuna özel filtre menüsünü kurar. */
@@ -185,11 +268,11 @@
       const align = mount.dataset.filterAlign || "left";
       let ms;
 
-      if (key === "unvan" || key === "baskanlik") {
+      if (METIN_FILTRE_ALANLARI.includes(key)) {
         ms = global.Apron.multiselect.create({
           triggerIcon: "filter",
           triggerClassName: "th-filter-trigger",
-          searchPlaceholder: key === "unvan" ? "Unvan ara…" : "Başkanlık ara…",
+          searchPlaceholder: METIN_FILTRE_ARAMA_PLACEHOLDER[key],
           multiple: true,
           panelAlign: align,
           onChange: (values) => {
@@ -199,14 +282,15 @@
         });
         ms.setOptions(distinctValues(key));
         ms.setSelected(filters[key]);
-      } else if (key === "egitim") {
+      } else if (key.indexOf("egitim_") === 0 && Model.HAVALIMANLARI.includes(key.slice("egitim_".length))) {
+        const h = key.slice("egitim_".length);
         ms = global.Apron.multiselect.create({
           triggerIcon: "filter",
           triggerClassName: "th-filter-trigger",
           multiple: false,
           panelAlign: align,
           onChange: (value) => {
-            filters.egitimDurumu = value;
+            filters.egitimDurumuByHavalimani[h] = value;
             refresh();
           },
         });
@@ -217,7 +301,7 @@
           { value: "Süresi Dolmuş", label: "Süresi Dolmuş" },
           { value: "Bilgi Yok", label: "Bilgi Yok" },
         ]);
-        ms.setSelected(filters.egitimDurumu);
+        ms.setSelected(filters.egitimDurumuByHavalimani[h]);
       } else if (Model.HAVALIMANLARI.includes(key)) {
         ms = global.Apron.multiselect.create({
           triggerIcon: "filter",
@@ -247,10 +331,10 @@
   function anyFilterActive() {
     return !!(
       filters.q ||
-      filters.baskanlik.length ||
-      filters.unvan.length ||
-      filters.egitimDurumu ||
-      Object.values(filters.havalimaniDurum).some(Boolean)
+      METIN_FILTRE_ALANLARI.some((k) => filters[k].length) ||
+      Object.values(filters.havalimaniDurum).some(Boolean) ||
+      Object.values(filters.egitimDurumuByHavalimani).some(Boolean) ||
+      filters.chips.size
     );
   }
 
@@ -264,7 +348,7 @@
       placeholder: "Sütun Ekle",
       searchPlaceholder: "Sütun ara…",
       triggerId: "col-picker",
-      triggerClassName: "btn btn--sm",
+      triggerClassName: "btn",
       triggerIcon: "plus",
       staticLabel: true,
       maxSelected: MAX_OPTIONAL_COLUMNS,
@@ -308,17 +392,30 @@
       filters = defaultFilters();
       qs(root, "#f-q").value = "";
       Object.values(columnFilterMs).forEach((ms) => ms.clear());
+      qsa(root, "[data-chip]").forEach((btn) => btn.classList.remove("is-active"));
       refresh();
       updateClearFiltersVisibility(root);
     });
     qs(root, "#dash-export").addEventListener("click", () => exportCurrentView(root));
+
+    qsa(root, "[data-chip]").forEach((btn) => {
+      btn.classList.toggle("is-active", filters.chips.has(btn.dataset.chip));
+      btn.addEventListener("click", () => {
+        const key = btn.dataset.chip;
+        if (filters.chips.has(key)) filters.chips.delete(key);
+        else filters.chips.add(key);
+        btn.classList.toggle("is-active", filters.chips.has(key));
+        refresh();
+        updateClearFiltersVisibility(root);
+      });
+    });
   }
 
   function sortableTh(col, removable) {
     return `
       <th data-sort-key="${col.key}">
         <span class="th-sortable__inner">
-          ${escapeHtml(col.label)}
+          ${col.dotClass ? `<span class="airport-dot ${col.dotClass}"></span>` : ""}${escapeHtml(col.label)}
           <span class="th-sortable__icon"></span>
           ${col.filter ? `<span class="th-filter-mount" data-filter-mount="${col.filter}" data-filter-align="${col.filterAlign || "left"}"></span>` : ""}
           ${removable ? `<button type="button" class="th-remove" data-remove-col="${col.key}" title="Sütunu kaldır">${icon("close", { size: 11 })}</button>` : ""}
@@ -381,12 +478,15 @@
     if (optCol) {
       va = optCol.sortVal(a) || "";
       vb = optCol.sortVal(b) || "";
-    } else if (key === "AHL" || key === "IGA_AO" || key === "IGA_TTAS" || key === "HEAS") {
+    } else if (key === "AHL" || key === "IGA_AO" || key === "HEAS") {
       va = a.havalimani_var[key] ? "VAR" : "YOK";
       vb = b.havalimani_var[key] ? "VAR" : "YOK";
-    } else if (key === "egitim") {
-      const da = (a.guncel_egitim && a.guncel_egitim.bitis_tarihi) || "";
-      const db = (b.guncel_egitim && b.guncel_egitim.bitis_tarihi) || "";
+    } else if (key.indexOf("egitim_") === 0 && Model.HAVALIMANLARI.includes(key.slice("egitim_".length))) {
+      const h = key.slice("egitim_".length);
+      const ka = a.egitim_by_havalimani[h];
+      const kb = b.egitim_by_havalimani[h];
+      const da = (ka && ka.bitis_tarihi) || "";
+      const db = (kb && kb.bitis_tarihi) || "";
       // Eğitim tarihi olmayan (Bilgi Yok) kayıtlar yöne bakılmaksızın en sona düşer.
       if (!da && db) return 1;
       if (da && !db) return -1;
@@ -407,8 +507,9 @@
         const hay = `${r.sicil} ${r.ad_soyad} ${r.tc_kimlik_no} ${r.unvan} ${r.baskanlik}`.toLocaleLowerCase("tr-TR");
         if (!hay.includes(filters.q)) return false;
       }
-      if (filters.baskanlik.length && !filters.baskanlik.includes(r.baskanlik)) return false;
-      if (filters.unvan.length && !filters.unvan.includes(r.unvan)) return false;
+      for (const k of METIN_FILTRE_ALANLARI) {
+        if (filters[k].length && !filters[k].includes(r[k])) return false;
+      }
       for (const h of Model.HAVALIMANLARI) {
         const durum = filters.havalimaniDurum[h];
         if (!durum) continue;
@@ -416,7 +517,13 @@
         if (durum === "VAR" && !varMi) return false;
         if (durum === "YOK" && varMi) return false;
       }
-      if (filters.egitimDurumu && r.egitim_durumu !== filters.egitimDurumu) return false;
+      for (const h of Model.HAVALIMANLARI) {
+        const durum = filters.egitimDurumuByHavalimani[h];
+        if (durum && r.egitim_durumu_by_havalimani[h] !== durum) return false;
+      }
+      for (const chip of QUICK_FILTER_CHIPS) {
+        if (filters.chips.has(chip.key) && !chip.test(r)) return false;
+      }
       return true;
     });
     if (sortState.key) rows.sort(compareRows);
@@ -429,7 +536,6 @@
     const dolmus = rows.filter((r) => r.egitim_durumu === "Süresi Dolmuş").length;
     const ahl = rows.filter((r) => r.havalimani_var.AHL).length;
     const iga = rows.filter((r) => r.havalimani_var.IGA_AO).length;
-    const igaTtas = rows.filter((r) => r.havalimani_var.IGA_TTAS).length;
     const heas = rows.filter((r) => r.havalimani_var.HEAS).length;
     const esikGun = currentSettings.uyari_esik_gun;
     const filtreAktif = anyFilterActive();
@@ -439,11 +545,10 @@
     const m = currentSettings.maliyetler;
     const gbsSayi = rows.filter((r) => r.guncel_egitim).length;
     const igaTutar = m.IGA_AO * iga;
-    const igaTtasTutar = m.IGA_TTAS * igaTtas;
     const ahlTutar = m.AHL * ahl;
     const heasTutar = m.HEAS * heas;
     const gbsTutar = m.GBS * gbsSayi;
-    const kartTutarToplam = ahlTutar + igaTutar + igaTtasTutar + heasTutar;
+    const kartTutarToplam = ahlTutar + igaTutar + heasTutar;
     const toplamGider = kartTutarToplam + gbsTutar;
     const maliyetEtiket = `${filtreAktif ? "Filtrelenen" : "Tüm Şirket"} (${N.formatNumberTr(rows.length)} Personel)`;
 
@@ -458,7 +563,6 @@
           <div class="stat-chip-row">
             ${airportChip("AHL", N.formatNumberTr(ahl), "blue")}
             ${airportChip("İGA", N.formatNumberTr(iga), "teal")}
-            ${airportChip("İGA TTAŞ", N.formatNumberTr(igaTtas), "violet")}
             ${airportChip("HEAŞ", N.formatNumberTr(heas), "neutral")}
           </div>
         </div>
@@ -483,10 +587,9 @@
         <div class="stat-panel__row stat-panel__row--cost">
           ${costItem("AHL", ahlTutar, `${N.formatTL(m.AHL)} × ${N.formatNumberTr(ahl)} Kart`, "blue")}
           ${costItem("İGA", igaTutar, `${N.formatTL(m.IGA_AO)} × ${N.formatNumberTr(iga)} Kart`, "teal")}
-          ${costItem("İGA TTAŞ", igaTtasTutar, `${N.formatTL(m.IGA_TTAS)} × ${N.formatNumberTr(igaTtas)} Kart`, "violet")}
           ${costItem("HEAŞ (SAW)", heasTutar, `${N.formatTL(m.HEAS)} (${m.HEAS_eur}€) × ${N.formatNumberTr(heas)} Kart`, "neutral")}
           <span class="stat-panel__divider"></span>
-          ${costItem("Kart Ücretleri Toplamı", kartTutarToplam, `${N.formatNumberTr(ahl + iga + igaTtas + heas)} Kart · 4 Havalimanı`, "amber")}
+          ${costItem("Kart Ücretleri Toplamı", kartTutarToplam, `${N.formatNumberTr(ahl + iga + heas)} Kart · 3 Havalimanı`, "amber")}
           ${costItem("Sertifika Giderleri", gbsTutar, `${N.formatTL(m.GBS)} × ${N.formatNumberTr(gbsSayi)} Kart Sahibi`, "red")}
           <div class="stat-panel__total">
             <span class="stat-panel__item-label">Toplam Gider</span>
@@ -538,7 +641,7 @@
     updateClearFiltersVisibility(root);
 
     if (!rows.length) {
-      tbody.innerHTML = `<tr><td colspan="${10 + optCols.length}"><div class="table-empty">Filtrelere uyan kayıt bulunamadı.</div></td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="${8 + EGITIM_SUTUNLARI.length + optCols.length}"><div class="table-empty">Filtrelere uyan kayıt bulunamadı.</div></td></tr>`;
       return;
     }
 
@@ -546,17 +649,16 @@
       .map(
         (r) => `
       <tr data-tc="${escapeHtml(r.tc_kimlik_no)}">
-        <td class="mono">${escapeHtml(r.tc_kimlik_no || "—")}</td>
-        <td class="data__name">${escapeHtml(r.ad_soyad)}</td>
-        <td>${escapeHtml(r.unvan || "—")}</td>
-        <td>${escapeHtml(r.baskanlik || "—")}</td>
+        <td class="mono">${escapeHtml(up(r.sicil || ""))}</td>
+        <td class="mono">${escapeHtml(up(r.tc_kimlik_no || "—"))}</td>
+        <td class="data__name">${escapeHtml(up(r.ad_soyad))}</td>
+        <td>${escapeHtml(up(r.unvan || "—"))}</td>
+        <td>${escapeHtml(up(r.baskanlik || "—"))}</td>
         <td>${varYokBadge(r.havalimani_var.AHL)}</td>
         <td>${varYokBadge(r.havalimani_var.IGA_AO)}</td>
-        <td>${varYokBadge(r.havalimani_var.IGA_TTAS)}</td>
         <td>${varYokBadge(r.havalimani_var.HEAS)}</td>
-        <td>${egitimBadge(r.egitim_durumu)}</td>
-        <td>${egitimTarihHucresi(r.guncel_egitim)}</td>
-        ${optCols.map((c) => `<td>${escapeHtml(c.get(r))}</td>`).join("")}
+        ${EGITIM_SUTUNLARI.map((c) => `<td>${egitimHucresi(r.egitim_durumu_by_havalimani[c.havalimani], r.egitim_by_havalimani[c.havalimani])}</td>`).join("")}
+        ${optCols.map((c) => `<td>${escapeHtml(up(c.get(r)))}</td>`).join("")}
       </tr>
     `
       )
@@ -577,14 +679,20 @@
   }
 
   function egitimBadge(durum) {
+    // cls eşlemesi ORİJİNAL (Türkçe karışık büyük/küçük) durum metnine göre
+    // yapılır — görünen yazı ayrıca büyük harfe çevrilir (bkz. up()), ama
+    // eşleme anahtarları bundan etkilenmemeli.
     const cls = { Aktif: "ind--aktif", "Yaklaşıyor": "ind--yaklasiyor", "Süresi Dolmuş": "ind--dolmus", "Bilgi Yok": "ind--bilgiyok" }[durum];
-    return `<span class="ind ${cls}"><span class="ind__dot"></span>${escapeHtml(durum)}</span>`;
+    return `<span class="ind ${cls}"><span class="ind__dot"></span>${escapeHtml(up(durum))}</span>`;
   }
 
-  function egitimTarihHucresi(kayit) {
-    return kayit && kayit.bitis_tarihi
-      ? `<span class="data__muted mono">${N.formatDateTr(kayit.bitis_tarihi)}</span>`
-      : `<span class="data__muted">—</span>`;
+  /** Bir havalimanının eğitim hücresi: durum rozeti + altında (belirgin) bitiş tarihi. */
+  function egitimHucresi(durum, kayit) {
+    const tarihVar = kayit && kayit.bitis_tarihi;
+    const tarihHtml = tarihVar
+      ? `<span class="airport-cell__date mono">${N.formatDateTr(kayit.bitis_tarihi)}</span>`
+      : `<span class="airport-cell__date airport-cell__date--muted">—</span>`;
+    return `<div class="airport-cell">${egitimBadge(durum)}${tarihHtml}</div>`;
   }
 
   function exportCurrentView(root) {
@@ -592,20 +700,23 @@
     // Ekranda o an görünen isteğe bağlı sütunlar da dahil edilir (WYSIWYG).
     const optCols = activeColumns.map(optionalColumnByKey).filter(Boolean);
     const header = [
-      "TC KİMLİK NO", "AD SOYAD", "UNVAN", "BAŞKANLIK", "AHL", "İGA", "İGA TTAŞ", "HEAŞ", "GÜV. BİL. DURUM", "GÜV. BİL. BİTİŞ",
+      "SİCİL", "TC KİMLİK NO", "AD SOYAD", "UNVAN", "BAŞKANLIK", "AHL", "İGA", "HEAŞ",
+      ...EGITIM_SUTUNLARI.flatMap((c) => [`${N.turkishUpper(Model.HAVALIMANI_ETIKET[c.havalimani])} EĞİTİM DURUM`, `${N.turkishUpper(Model.HAVALIMANI_ETIKET[c.havalimani])} EĞİTİM BİTİŞ`]),
       ...optCols.map((c) => N.turkishUpper(c.label)),
     ];
     const data = rows.map((r) => [
+      r.sicil,
       r.tc_kimlik_no,
       r.ad_soyad,
       r.unvan,
       r.baskanlik,
       r.havalimani_var.AHL ? "VAR" : "YOK",
       r.havalimani_var.IGA_AO ? "VAR" : "YOK",
-      r.havalimani_var.IGA_TTAS ? "VAR" : "YOK",
       r.havalimani_var.HEAS ? "VAR" : "YOK",
-      r.egitim_durumu,
-      r.guncel_egitim ? N.formatDateTr(r.guncel_egitim.bitis_tarihi) : "—",
+      ...EGITIM_SUTUNLARI.flatMap((c) => {
+        const k = r.egitim_by_havalimani[c.havalimani];
+        return [r.egitim_durumu_by_havalimani[c.havalimani], k && k.bitis_tarihi ? N.formatDateTr(k.bitis_tarihi) : "—"];
+      }),
       ...optCols.map((c) => c.get(r)),
     ]);
     const ws = global.XLSX.utils.aoa_to_sheet([header, ...data]);

@@ -15,7 +15,6 @@
   const KAYNAKLAR = {
     AHL: { key: "AHL", etiket: "AHL" },
     IGA_AO: { key: "IGA_AO", etiket: "İGA AO" },
-    IGA_TTAS: { key: "IGA_TTAS", etiket: "İGA TTAŞ" },
     HEAS: { key: "HEAS", etiket: "HEAŞ (SAW)" },
     PERSONEL: { key: "PERSONEL", etiket: "Personel / Unvan Listesi" },
   };
@@ -25,31 +24,41 @@
   const DEFAULT_PROFILES = {
     AHL: {
       kaynak: "AHL",
-      aciklama: "İşletme, Bölüm, AD, SOYAD, KARTNO, OPSIYON, TCKİMLİKNO, KURS-1 sütunlarını içeren AHL apron Excel'i.",
+      aciklama: "İşletme, Bölüm, AD, SOYAD, KARTNO, TCKİMLİKNO, KURS-1 sütunlarını içeren AHL apron Excel'i.",
       alanlar: [
         { hedef_alan: "tc_kimlik_no", excel_sutun: "TCKİMLİKNO", zorunlu: true },
         { hedef_alan: "ad", excel_sutun: "AD", zorunlu: true },
         { hedef_alan: "soyad", excel_sutun: "SOYAD", zorunlu: true },
-        { hedef_alan: "baskanlik", excel_sutun: "Bölüm", zorunlu: false },
-        { hedef_alan: "kart_no", excel_sutun: "KARTNO", zorunlu: false },
+        // DÜZELTME (kullanıcı geri bildirimi, gerçek Excel örneğiyle): AHL'de
+        // "Bölüm" aslında UNVAN taşıyor (Uzman, Stajyer, Uzman Yardımcısı...),
+        // Başkanlık diye ayrı bir sütun yok. "KARTNO" da apron kart no değil,
+        // SİCİL NO. Eskiden bu ikisi ters eşleniyordu (Bölüm→Başkanlık,
+        // KARTNO→Kart No) — bkz. model.js ESKI_HATALI_ESLEMELER (kayıtlı eski
+        // profillerde de otomatik düzeltilir).
+        { hedef_alan: "unvan", excel_sutun: "Bölüm", zorunlu: false },
+        { hedef_alan: "sicil", excel_sutun: "KARTNO", zorunlu: false },
+        { hedef_alan: "baskanlik", excel_sutun: "", zorunlu: false, gizli: true },
+        { hedef_alan: "kart_no", excel_sutun: "", zorunlu: false, gizli: true },
         { hedef_alan: "taseron_firma", excel_sutun: "İşletme", zorunlu: false },
         { hedef_alan: "opsiyon_ham", excel_sutun: "OPSIYON", zorunlu: false, gizli: true },
-        // AHL kaynağında kart durumu / eğitim tarihi sütunu yok (bkz. README §3.3 açık not).
         { hedef_alan: "kart_durumu", excel_sutun: "", zorunlu: false, gizli: true },
         { hedef_alan: "baslangic_tarihi", excel_sutun: "", zorunlu: false, gizli: true },
         { hedef_alan: "bitis_tarihi", excel_sutun: "", zorunlu: false, gizli: true },
         { hedef_alan: "egitim_tarihi", excel_sutun: "", zorunlu: false, gizli: true },
+        // "KURS-1" aslında Güvenlik Bilinci Eğitimi'nin doğrudan bitiş tarihi
+        // (İGA AO'daki "Doküman Bitiş Tarihi" ile aynı mantık).
+        { hedef_alan: "egitim_bitis_tarihi_dogrudan", excel_sutun: "KURS-1", zorunlu: false },
         { hedef_alan: "gecerlilik_yili", excel_sutun: "", zorunlu: false, gizli: true },
       ],
       // Ayarlar > Eşleştirme Profilleri'nden eklenen, sabit şemada karşılığı
       // olmayan ek sütunlar (bkz. README §6). TC Kimlik No ile kişiye bağlanır.
-      ek_alanlar: [{ key: "kurs_1", excel_sutun: "KURS-1", etiket: "Kurs-1" }],
+      ek_alanlar: [],
       // Ayarlar > Eşleştirme Profilleri ekranında satırların gösterim sırası
       // (sürükle-bırak ile kullanıcı tarafından değiştirilebilir). "ek:<key>"
       // ek sütunu, düz "<hedef_alan>" sabit alanı işaret eder. gizli:true olan
       // alanlar (opsiyon_ham, kart_durumu vb.) kaybolmaz — soluk/gizli olarak
       // listenin sonunda görünür, göz ikonuyla tekrar açılabilir (bkz. settings.js).
-      siralama: ["taseron_firma", "baskanlik", "ad", "soyad", "kart_no", "tc_kimlik_no", "ek:kurs_1"],
+      siralama: ["taseron_firma", "unvan", "ad", "soyad", "sicil", "tc_kimlik_no", "egitim_bitis_tarihi_dogrudan"],
     },
 
     IGA_AO: {
@@ -66,33 +75,15 @@
         { hedef_alan: "baslangic_tarihi", excel_sutun: "Başlangıç Tarihi", zorunlu: false },
         { hedef_alan: "bitis_tarihi", excel_sutun: "Bitiş Tarihi", zorunlu: false },
         { hedef_alan: "taseron_firma", excel_sutun: "Taşeron Firma", zorunlu: false },
-        // Netleşen karar (README §3.3): İGA'da ayrı eğitim tarihi alanı yok,
-        // "Bitiş Tarihi" vekil (proxy) alan olarak kullanılıyor.
-        { hedef_alan: "egitim_tarihi", excel_sutun: "Bitiş Tarihi", zorunlu: false },
-        { hedef_alan: "gecerlilik_yili", excel_sutun: "", zorunlu: false },
-        { hedef_alan: "pasif_aciklama", excel_sutun: "Pasif Açıklama", zorunlu: false },
-      ],
-      ek_alanlar: [],
-    },
-
-    // İGA TTAŞ: ayrı bir dosya olarak yüklenen, İGA AO'dan bağımsız 4. kaynak —
-    // ama Excel'i aynı taşeron/apron başvuru sistemi üzerinden geldiği için
-    // sütun başlıkları İGA AO ile birebir aynı (kullanıcı isteği).
-    IGA_TTAS: {
-      kaynak: "IGA_TTAS",
-      aciklama: "Form No, Müracaat Türü, Onay Durumu, Kurumu, Taşeron Firma, Adı, Soyadı, T.C. Kimlik No/Pasaport No, Bölüm, Unvan, Doküman Bitiş Tarihi, Kartın Durumu, Başlangıç Tarihi, Bitiş Tarihi, Kart Ücreti, Pasif Açıklama sütunlarını içeren İGA TTAŞ apron Excel'i (İGA AO ile aynı sütun yapısı, ayrı dosya).",
-      alanlar: [
-        { hedef_alan: "tc_kimlik_no", excel_sutun: "T.C. Kimlik No/Pasaport No", zorunlu: true },
-        { hedef_alan: "ad", excel_sutun: "Adı", zorunlu: true },
-        { hedef_alan: "soyad", excel_sutun: "Soyadı", zorunlu: true },
-        { hedef_alan: "unvan", excel_sutun: "Unvan", zorunlu: false },
-        { hedef_alan: "baskanlik", excel_sutun: "Bölüm", zorunlu: false },
-        { hedef_alan: "kart_no", excel_sutun: "Form No", zorunlu: false },
-        { hedef_alan: "kart_durumu", excel_sutun: "Kartın Durumu", zorunlu: false },
-        { hedef_alan: "baslangic_tarihi", excel_sutun: "Başlangıç Tarihi", zorunlu: false },
-        { hedef_alan: "bitis_tarihi", excel_sutun: "Bitiş Tarihi", zorunlu: false },
-        { hedef_alan: "taseron_firma", excel_sutun: "Taşeron Firma", zorunlu: false },
-        { hedef_alan: "egitim_tarihi", excel_sutun: "Bitiş Tarihi", zorunlu: false },
+        // DÜZELTME (kullanıcı geri bildirimi): İGA'da ayrı bir eğitim BAŞLANGIÇ
+        // tarihi yok, ama "Doküman Bitiş Tarihi" kartın/eğitimin GERÇEKTEN ne
+        // zaman süresi dolacağını gösteriyor — daha önce yanlışlıkla "Bitiş
+        // Tarihi" sütunu (kişiye özgü olmayan, sabit bir idari tarih) eğitim
+        // BAŞLANGICI sayılıp üstüne bir de geçerlilik yılı ekleniyordu; süresi
+        // dolmuş eğitimler yıllarca "Aktif" görünüyordu. Artık bu doğrudan
+        // bitiş tarihi olarak kullanılıyor (bkz. model.js upsertEgitimKaydi).
+        { hedef_alan: "egitim_bitis_tarihi_dogrudan", excel_sutun: "Doküman Bitiş Tarihi", zorunlu: false },
+        { hedef_alan: "egitim_tarihi", excel_sutun: "", zorunlu: false },
         { hedef_alan: "gecerlilik_yili", excel_sutun: "", zorunlu: false },
         { hedef_alan: "pasif_aciklama", excel_sutun: "Pasif Açıklama", zorunlu: false },
       ],
@@ -116,6 +107,13 @@
         { hedef_alan: "egitim_tarihi", excel_sutun: "Eğitim Tarihi", zorunlu: false },
         { hedef_alan: "gecerlilik_yili", excel_sutun: "Dönemi", zorunlu: false, gizli: true },
         { hedef_alan: "kart_cinsi", excel_sutun: "Kartın Cinsi", zorunlu: false },
+        // DÜZELTME (kullanıcı geri bildirimi): "Eğitim / Kurs-1" aslında genel
+        // bir metin değil, Güvenlik Bilinci Eğitimi'nin GEÇERLİ olup olmadığını
+        // gösteren "Var"/"Yok" durumu — "Yok" ise eğitim kesin süresi dolmuş
+        // sayılır (tarih hesabı ne derse desin), "Var" ise normal tarih +
+        // Dönemi hesabına göre Aktif/Yaklaşıyor değerlendirilir (bkz. model.js
+        // upsertEgitimKaydi). Önceden anlamsız bir Ek Sütun olarak duruyordu.
+        { hedef_alan: "egitim_gecerlilik_ham", excel_sutun: "Eğitim / Kurs-1", zorunlu: false },
       ],
       // "Sıra No" (satır sırası, kişiye özgü anlamlı bilgi değil) ve "Ad Soyad"
       // (zaten Ad+Soyad'dan geliyor) kasıtlı olarak eşlenmedi; geri kalan yeni
@@ -129,7 +127,6 @@
         { key: "iade_tarihi", excel_sutun: "İade Tarihi", etiket: "İade Tarihi" },
         { key: "kayip_bild_tarihi", excel_sutun: "Kayıp Bild. Tarihi", etiket: "Kayıp Bild. Tarihi" },
         { key: "son_tarih", excel_sutun: "Son Tarih", etiket: "Son Tarih" },
-        { key: "egitim_kurs_1", excel_sutun: "Eğitim / Kurs-1", etiket: "Eğitim / Kurs-1" },
         { key: "mur_durum", excel_sutun: "Mur Durum", etiket: "Mur Durum" },
         { key: "kab_tarih", excel_sutun: "KAB Tarih", etiket: "KAB Tarih" },
         { key: "randevu_tarihi", excel_sutun: "Randevu Tarihi", etiket: "Randevu Tarihi" },
@@ -141,7 +138,7 @@
       siralama: [
         "tc_kimlik_no", "ad", "soyad", "unvan", "baskanlik", "acik_bolum", "egitim_tarihi", "kart_cinsi",
         "ek:muracaat_tipi", "baslangic_tarihi", "ek:teslim_tarihi", "ek:iade_tarihi", "ek:kayip_bild_tarihi",
-        "ek:son_tarih", "ek:egitim_kurs_1", "ek:mur_durum", "kart_durumu", "ek:kab_tarih", "ek:randevu_tarihi",
+        "ek:son_tarih", "egitim_gecerlilik_ham", "ek:mur_durum", "kart_durumu", "ek:kab_tarih", "ek:randevu_tarihi",
       ],
     },
 
@@ -176,6 +173,8 @@
     taseron_firma: "Taşeron Firma (Bilgi butonu)",
     opsiyon_ham: "Opsiyon (ham bilgi)",
     egitim_tarihi: "Güvenlik Bilinci Eğitim Tarihi",
+    egitim_bitis_tarihi_dogrudan: "Eğitim/Kart Süresi Bitiş Tarihi (doğrudan)",
+    egitim_gecerlilik_ham: "Eğitim Geçerlilik Durumu (Var/Yok)",
     gecerlilik_yili: "Eğitim Geçerlilik Süresi (3/5 Yıl)",
     pasif_aciklama: "Pasif Açıklama",
     kart_cinsi: "Kartın Cinsi",

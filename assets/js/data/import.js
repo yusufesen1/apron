@@ -10,7 +10,7 @@
   const { Store } = global.Apron.DB;
   const Model = global.Apron.model;
 
-  const DATE_FIELDS = new Set(["baslangic_tarihi", "bitis_tarihi", "egitim_tarihi"]);
+  const DATE_FIELDS = new Set(["baslangic_tarihi", "bitis_tarihi", "egitim_tarihi", "egitim_bitis_tarihi_dogrudan"]);
 
   function normalizeHeader(h) {
     return N.cleanText(h).toLocaleLowerCase("tr-TR").replace(/\s+/g, " ");

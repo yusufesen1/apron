@@ -14,7 +14,7 @@
   const Model = global.Apron.model;
   const KAYNAKLAR = global.Apron.mapping.KAYNAKLAR;
 
-  const KAYNAK_SIRASI = ["AHL", "IGA_AO", "IGA_TTAS", "HEAS", "PERSONEL"];
+  const KAYNAK_SIRASI = ["AHL", "IGA_AO", "HEAS", "PERSONEL"];
 
   async function render(root, isActive = () => true) {
     const customKaynaklar = await Model.getCustomKaynaklar();

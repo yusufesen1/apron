@@ -65,10 +65,6 @@
                 <input class="input" id="maliyet-IGA_AO" type="number" min="0" step="1" value="${settings.maliyetler.IGA_AO}" />
               </div>
               <div class="field">
-                <label class="field__label" for="maliyet-IGA_TTAS">İGA TTAŞ Kart Ücreti (₺)</label>
-                <input class="input" id="maliyet-IGA_TTAS" type="number" min="0" step="1" value="${settings.maliyetler.IGA_TTAS}" />
-              </div>
-              <div class="field">
                 <label class="field__label" for="maliyet-HEAS">HEAŞ Kart Ücreti (₺)</label>
                 <input class="input" id="maliyet-HEAS" type="number" min="0" step="1" value="${settings.maliyetler.HEAS}" />
               </div>
@@ -264,7 +260,6 @@
         ...guncel,
         AHL: Number(qs(root, "#maliyet-AHL").value) || 0,
         IGA_AO: Number(qs(root, "#maliyet-IGA_AO").value) || 0,
-        IGA_TTAS: Number(qs(root, "#maliyet-IGA_TTAS").value) || 0,
         HEAS: Number(qs(root, "#maliyet-HEAS").value) || 0,
         HEAS_eur: Number(qs(root, "#maliyet-HEAS_eur").value) || 0,
       };

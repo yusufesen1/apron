@@ -46,11 +46,11 @@
     document.getElementById("app").innerHTML = `
       <div class="brand-strip" aria-hidden="true"></div>
       <div class="topbar">
-        <div class="brand">
+        <button type="button" class="brand" id="brand-home" aria-label="Genel Bakış'a dön">
           <img class="brand__logo" src="assets/img/tss-logo-siyah.png" alt="Turkish Support Services" />
           <span class="brand__divider" aria-hidden="true"></span>
           <span class="brand__name">Apron Kart Takip Sistemi</span>
-        </div>
+        </button>
       </div>
       <nav class="tabs" role="tablist" aria-label="Bölümler">
         ${TABS.map((t) => `<button type="button" class="tab" role="tab" data-tab="${t.id}" aria-selected="false">${t.label}</button>`).join("")}
@@ -61,6 +61,10 @@
     document.querySelectorAll(".tab").forEach((btn) => {
       btn.addEventListener("click", () => showTab(btn.dataset.tab));
     });
+
+    // Logo/marka alanına tıklanınca, sitelerdeki alışılmış "ana sayfaya dön"
+    // davranışıyla Genel Bakış'a döner — hangi sekmede olunursa olsun.
+    document.getElementById("brand-home").addEventListener("click", () => showTab("dashboard"));
   }
 
   async function init() {

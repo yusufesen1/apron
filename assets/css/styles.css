@@ -120,10 +120,23 @@ a:hover { text-decoration: underline; }
   z-index: 5;
 }
 .brand {
+  appearance: none;
+  border: none;
+  background: none;
+  padding: var(--sp-1);
+  margin: calc(var(--sp-1) * -1);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
   display: flex;
   align-items: center;
   gap: var(--sp-4);
+  transition: opacity var(--dur-hover) var(--ease), background var(--dur-hover) var(--ease);
 }
+.brand:hover { opacity: .8; background: var(--tint); }
+.brand:active { opacity: .65; }
 .brand__logo {
   display: block;
   height: 32px;
@@ -219,6 +232,7 @@ a:hover { text-decoration: underline; }
 .btn:disabled { opacity: .45; cursor: not-allowed; transform: none; box-shadow: none; }
 .btn:disabled:hover { border-color: var(--line-strong); color: var(--ink); }
 
+/* Dolgulu, gölgeli kırmızı — yalnızca en kritik/geri alınamaz aksiyonlar için. */
 .btn--primary {
   background: linear-gradient(180deg, var(--red), var(--red-pressed));
   border-color: var(--red-pressed);
@@ -234,6 +248,12 @@ a:hover { text-decoration: underline; }
 
 .btn--ghost { border-color: transparent; background: transparent; box-shadow: none; }
 .btn--ghost:hover { border-color: transparent; background: var(--tint); box-shadow: none; }
+
+/* Hafif vurgu — dolgulu --primary'den daha sakin: beyaz zemin, kırmızı
+   kontur/yazı. "Excel'e Aktar" gibi ikincil ama yine de öne çıkması istenen
+   aksiyonlar için (kullanıcı geri bildirimi: dolgulu kırmızı "çok belirgin"). */
+.btn--accent { border-color: var(--red); color: var(--red); }
+.btn--accent:hover { background: var(--red-tint); border-color: var(--red); color: var(--red); box-shadow: var(--shadow-sm); }
 
 .btn--sm { padding: var(--sp-1) var(--sp-3); font-size: 12px; }
 
@@ -449,14 +469,14 @@ table.data {
 }
 table.data thead th {
   text-align: left;
-  font-weight: 600;
+  font-weight: 700;
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: .04em;
-  color: var(--muted);
+  color: var(--ink);
   padding: var(--sp-3) var(--sp-4);
-  border-bottom: 1px solid var(--line);
-  background: var(--surface-2);
+  border-bottom: 2px solid var(--line-strong);
+  background: var(--tint);
   position: sticky;
   top: 0;
   white-space: nowrap;
@@ -561,6 +581,32 @@ table.data tbody tr:last-child td { border-bottom: none; }
 .ind--dolmus { color: #fff; background: linear-gradient(180deg, var(--red), var(--red-pressed)); }
 .ind--bilgiyok { color: var(--muted); background: transparent; border: 1px dashed var(--line-strong); }
 .ind__dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: none; }
+
+/* Havalimanı başına eğitim hücresi (Genel Bakış — AHL/İGA/HEAŞ Eğitimi
+   sütunları): durum rozeti + altında bitiş tarihi. Tarih, sekmede taranırken
+   rozetle beraber okunabilsin diye belirgin tutulur (düz --muted-2 yerine
+   --text + tabular rakam + hafif kalınlık). */
+.airport-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 96px;
+}
+.airport-cell__date {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.airport-cell__date--muted { color: var(--muted-2); font-weight: 400; }
+
+/* Sütun başlığındaki havalimanı rengi noktası (AHL/İGA/HEAŞ Eğitimi) —
+   aynı renk anahtarları stat-chip'lerde de kullanılıyor (mavi/teal/nötr). */
+.airport-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; display: inline-block; }
+.airport-dot--ahl { background: var(--blue); }
+.airport-dot--iga { background: var(--teal); }
+.airport-dot--heas { background: var(--muted-2); }
 
 /* ---------- Modal (Katman) ---------- */
 .modal-backdrop {
@@ -686,6 +732,7 @@ table.data tbody tr:last-child td { border-bottom: none; }
   position: relative;
   display: flex;
   align-items: center;
+  gap: var(--sp-2);
 }
 .search-field__icon {
   position: absolute;
@@ -694,9 +741,46 @@ table.data tbody tr:last-child td { border-bottom: none; }
   pointer-events: none;
 }
 .search-field .input {
-  width: 100%;
+  flex: 1 1 auto;
+  width: auto;
   padding-left: calc(var(--sp-3) * 2 + 16px);
 }
+/* Arama çubuğunun sonundaki "Filtreleri Temizle" — sadece bir filtre
+   aktifken görünür (bkz. dashboard.js updateClearFiltersVisibility). */
+.search-field__clear { flex: none; white-space: nowrap; }
+
+/* Hazır tek-tık filtre çipleri (bkz. dashboard.js QUICK_FILTER_CHIPS) —
+   arama çubuğunun altında kendi satırında, huni filtreleriyle ifade
+   edilemeyen "HERHANGİ bir havalimanında X" türü sorguları tek tıkla
+   uygular. flex:1 1 100% ile filter-bar'da her zaman ayrı satıra düşer. */
+.quick-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  flex: 1 1 100%;
+}
+.quick-filter-chip {
+  appearance: none;
+  border: 1px solid var(--line-strong);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px var(--sp-3);
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color var(--dur-hover) var(--ease), background var(--dur-hover) var(--ease),
+    color var(--dur-hover) var(--ease), box-shadow var(--dur-hover) var(--ease);
+}
+.quick-filter-chip:hover { border-color: var(--red); color: var(--red); }
+.quick-filter-chip.is-active {
+  background: var(--red-tint);
+  border-color: var(--red);
+  color: var(--red);
+  box-shadow: var(--shadow-xs);
+}
+.quick-filter-chip.is-active::before { content: "✓ "; }
 
 /* ---------- Multiselect (aranabilir, çoklu seçim) ---------- */
 .multiselect { position: relative; min-width: 170px; }

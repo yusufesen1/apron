@@ -56,7 +56,7 @@
                         <td class="data__name">${escapeHtml(r.ad_soyad)}</td>
                         <td>${escapeHtml(r.baskanlik || "—")}</td>
                         <td>${havalimaniListesi(r.havalimani_var)}</td>
-                        <td>${r.guncel_egitim ? N.formatDateTr(r.guncel_egitim.bitis_tarihi) : "—"}</td>
+                        <td>${escapeHtml(tetikleyenEgitim(r))}</td>
                       </tr>
                     `
                       )
@@ -75,6 +75,20 @@
       .filter(([, val]) => val)
       .map(([k]) => Model.HAVALIMANI_ETIKET[k])
       .join(", ") || "—";
+  }
+
+  /**
+   * "Eğitim Bitiş" sütunu artık en iyimser (en geç biten) kaydı değil, bu
+   * satırın genel durumuna (r.egitim_durumu — en kötü havalimanı kazanır)
+   * yol açan havalimanının tarihini gösterir. Aksi halde örn. "Süresi
+   * Dolmuş" satırında AHL'de süresi dolmuş olsa bile HEAŞ'ın uzak tarihi
+   * gösterilip kafa karıştırabilirdi — bkz. oturum notları (Yavuz Kalafat).
+   */
+  function tetikleyenEgitim(r) {
+    const h = Model.HAVALIMANLARI.find((k) => r.egitim_durumu_by_havalimani[k] === r.egitim_durumu);
+    const kayit = h ? r.egitim_by_havalimani[h] : null;
+    if (!h || !kayit || !kayit.bitis_tarihi) return "—";
+    return `${Model.HAVALIMANI_ETIKET[h]}: ${N.formatDateTr(kayit.bitis_tarihi)}`;
   }
 
   global.Apron = global.Apron || {};

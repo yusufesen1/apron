@@ -72,8 +72,9 @@
     const s = cleanText(v);
     if (!s) return null;
 
-    // DD.MM.YYYY veya DD/MM/YYYY
-    let m = s.match(/^(\d{1,2})[.\/](\d{1,2})[.\/](\d{2,4})$/);
+    // DD.MM.YYYY, DD/MM/YYYY veya DD-MM-YYYY (gün/ay her zaman 1-2 hane
+    // olduğundan "YYYY-MM-DD" biçimiyle çakışmaz, aşağıdaki ayrı kural onu yakalar).
+    let m = s.match(/^(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{2,4})$/);
     if (m) {
       let [, d, mo, y] = m;
       if (y.length === 2) y = (Number(y) > 50 ? "19" : "20") + y;
@@ -146,7 +147,20 @@
     const s = cleanText(rawDurum);
     if (!s) return defaultWhenMissing;
     const up = turkishUpper(s);
-    return up === "AKTİF" || up === "AKTIF";
+    // Kaynağa göre "aktif kart" farklı kelimelerle yazılabiliyor — İGA/AHL'de
+    // "Aktif", HEAŞ'ta "Açık" (kullanıcı geri bildirimi: "Açık/Kapalı" yazıyor).
+    return up === "AKTİF" || up === "AKTIF" || up === "AÇIK" || up === "ACIK";
+  }
+
+  /** "Var"/"Yok" gibi ikili bir durum metnini bool'a çevirir (örn. HEAŞ'ta
+      "Eğitim / Kurs-1" — Var: eğitim geçerli, Yok: süresi dolmuş). */
+  function isVarDurumu(rawDurum, { defaultWhenMissing = null } = {}) {
+    const s = cleanText(rawDurum);
+    if (!s) return defaultWhenMissing;
+    const up = turkishUpper(s);
+    if (up === "VAR") return true;
+    if (up === "YOK") return false;
+    return defaultWhenMissing;
   }
 
   function formatNumberTr(n) {
@@ -178,6 +192,7 @@
     formatDateTr,
     parseGecerlilikYili,
     isDurumAktif,
+    isVarDurumu,
     formatNumberTr,
     formatTL,
     formatEsikSuresi,

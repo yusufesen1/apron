@@ -10,8 +10,8 @@
   const { Store } = global.Apron.DB;
   const N = global.Apron.normalize;
 
-  const HAVALIMANLARI = ["AHL", "IGA_AO", "IGA_TTAS", "HEAS"];
-  const HAVALIMANI_ETIKET = { AHL: "AHL", IGA_AO: "İGA", IGA_TTAS: "İGA TTAŞ", HEAS: "HEAŞ" };
+  const HAVALIMANLARI = ["AHL", "IGA_AO", "HEAS"];
+  const HAVALIMANI_ETIKET = { AHL: "AHL", IGA_AO: "İGA", HEAS: "HEAŞ" };
 
   const DEFAULT_SETTINGS = {
     key: "genel",
@@ -19,12 +19,12 @@
     // kayıt bazlı kullanılır. AHL ve İGA'da bu bilgi olmadığından, burada
     // havalimanı bazlı bir VARSAYILAN tanımlanır — Ayarlar ekranından
     // değiştirilebilir. Netleşene kadar geçici bir karardır.
-    egitim_sureleri_varsayilan: { AHL: 5, IGA_AO: 5, IGA_TTAS: 5, HEAS: 5 },
+    egitim_sureleri_varsayilan: { AHL: 5, IGA_AO: 5, HEAS: 5 },
     uyari_esik_gun: 60,
     // Kart/sertifika birim maliyetleri (₺) — Maliyet Tablosu panelinde kullanılır.
     // Başlangıç değerleri örnek/yer tutucudur, Ayarlar > Maliyet Ayarları'ndan
     // gerçek rakamlarla güncellenebilir.
-    maliyetler: { AHL: 2000, IGA_AO: 2000, IGA_TTAS: 2000, HEAS: 2800, HEAS_eur: 50, GBS: 700 },
+    maliyetler: { AHL: 2000, IGA_AO: 2000, HEAS: 2800, HEAS_eur: 50, GBS: 700 },
     // Genel Bakış tablosuna "Sütun Ekle" ile eklenen isteğe bağlı sütunlar
     // (anahtar listesi, eklenme sırasıyla — soldan sağa böyle dizilir).
     secili_sutunlar: [],
@@ -41,9 +41,63 @@
     });
   }
 
+  /**
+   * Bilinen ESKİ (hatalı) varsayılan eşlemeler — gerçek Excel örnekleriyle
+   * sonradan yanlış çıkan sütun eşlemeleri. Kayıtlı bir profil hâlâ TAM OLARAK
+   * bu eski değeri taşıyorsa (yani muhtemelen düzeltmeyi hiç görmedi), yeni
+   * varsayılana otomatik geçirilir. Kullanıcı o alanı BAŞKA bir değere
+   * kendi değiştirmişse (bu eski değerle eşleşmiyorsa) DOKUNULMAZ.
+   */
+  const ESKI_HATALI_ESLEMELER = {
+    AHL: {
+      // "Bölüm" aslında Unvan taşıyor, Başkanlık AHL'de yok; "KARTNO" apron
+      // kart no değil Sicil No (bkz. kullanıcı geri bildirimi).
+      baskanlik: "Bölüm",
+      kart_no: "KARTNO",
+    },
+    IGA_AO: {
+      // "Bitiş Tarihi" kişiye özgü olmayan sabit bir idari tarihti; gerçek
+      // eğitim bitişi "Doküman Bitiş Tarihi" (egitim_bitis_tarihi_dogrudan).
+      egitim_tarihi: "Bitiş Tarihi",
+    },
+  };
+
+  /**
+   * Kaydedilmiş bir profili koddaki güncel varsayılanla birleştirir:
+   * 1) Kodda sonradan eklenen ama kayıtlı profilde henüz olmayan hedef
+   *    alanlar (örn. egitim_bitis_tarihi_dogrudan gibi bir hata düzeltmesiyle
+   *    eklenen yeni bir alan) otomatik eklenir.
+   * 2) ESKI_HATALI_ESLEMELER'de listeli, kayıtlı profilde hâlâ TAM olarak eski
+   *    (hatalı) değeriyle duran eşlemeler yeni varsayılana güncellenir.
+   * Kullanıcının KENDİ seçtiği farklı bir değer varsa dokunulmaz; hiçbir şey
+   * silinmez. Böylece kullanıcı "Varsayılana Döndür"e basmasa bile bir
+   * sonraki import'ta düzeltmeler otomatik devreye girer.
+   */
+  function birlestirProfil(kayitli, varsayilan) {
+    if (!kayitli) return varsayilan;
+    const next = JSON.parse(JSON.stringify(kayitli));
+    if (!Array.isArray(next.alanlar)) next.alanlar = [];
+    const varHedefler = new Set(next.alanlar.map((a) => a.hedef_alan));
+    varsayilan.alanlar.forEach((a) => {
+      if (!varHedefler.has(a.hedef_alan)) next.alanlar.push(JSON.parse(JSON.stringify(a)));
+    });
+
+    const eskiHatali = ESKI_HATALI_ESLEMELER[varsayilan.kaynak];
+    if (eskiHatali) {
+      next.alanlar.forEach((a) => {
+        const eskiDeger = eskiHatali[a.hedef_alan];
+        if (eskiDeger !== undefined && a.excel_sutun === eskiDeger) {
+          const guncelAlan = varsayilan.alanlar.find((x) => x.hedef_alan === a.hedef_alan);
+          if (guncelAlan) a.excel_sutun = guncelAlan.excel_sutun;
+        }
+      });
+    }
+    return next;
+  }
+
   function getMappingProfile(kaynak) {
-    return Store.get("mapping_profiles", kaynak).then(
-      (p) => p || global.Apron.mapping.DEFAULT_PROFILES[kaynak]
+    return Store.get("mapping_profiles", kaynak).then((p) =>
+      birlestirProfil(p, global.Apron.mapping.DEFAULT_PROFILES[kaynak])
     );
   }
 
@@ -53,7 +107,7 @@
       list.forEach((p) => (byKey[p.kaynak] = p));
       const merged = {};
       Object.keys(global.Apron.mapping.DEFAULT_PROFILES).forEach((k) => {
-        merged[k] = byKey[k] || global.Apron.mapping.DEFAULT_PROFILES[k];
+        merged[k] = birlestirProfil(byKey[k], global.Apron.mapping.DEFAULT_PROFILES[k]);
       });
       return merged;
     });
@@ -199,7 +253,13 @@
     if (row.ad) next.ad = isAuthoritative || !existing.ad ? row.ad : existing.ad;
     if (row.soyad) next.soyad = isAuthoritative || !existing.soyad ? row.soyad : existing.soyad;
 
-    if (isAuthoritative && row.sicil) next.sicil = row.sicil;
+    // Eskiden sicil SADECE Personel listesinden kabul ediliyordu (tasarımın
+    // ilk varsayımı: sicil yalnızca orada olur). Artık AHL gibi başka
+    // kaynaklar da sicil taşıyabiliyor — unvan/başkanlıkla aynı öncelik
+    // kuralı: Personel her zaman kazanır, diğer kaynaklar sadece boşsa doldurur.
+    if (row.sicil) {
+      if (isAuthoritative || !existing.sicil) next.sicil = row.sicil;
+    }
 
     if (row.unvan) {
       if (isAuthoritative || !existing.unvan) {
@@ -272,21 +332,38 @@
    * havalimanı için Ayarlar'daki varsayılan süre kullanılır.
    */
   function upsertEgitimKaydi(batch, row, kaynak, importId, settings) {
-    if (!row.egitim_tarihi) return null;
+    // Bazı kaynaklarda (İGA AO gibi) gerçek eğitim BAŞLANGIÇ tarihi yok, ama
+    // dosyanın kendisi zaten hesaplanmış bir BİTİŞ tarihi veriyor (örn.
+    // "Doküman Bitiş Tarihi"). Böyle durumda üstüne bir daha geçerlilik yılı
+    // EKLEMEK yerine bu tarih doğrudan bitiş olarak kullanılır — aksi halde
+    // süresi dolmuş eğitimler yıllarca "Aktif" görünür (bkz. README §3.3).
+    const dogrudanBitis = row.egitim_bitis_tarihi_dogrudan;
+    if (!row.egitim_tarihi && !dogrudanBitis) return null;
 
     const id = `${row.tc_kimlik_no}__${kaynak}`;
     const gecerlilikYili =
       row.gecerlilik_yili || (settings.egitim_sureleri_varsayilan && settings.egitim_sureleri_varsayilan[kaynak]) || 5;
-    const bitisTarihi = N.addYearsIso(row.egitim_tarihi, gecerlilikYili);
+    const bitisTarihi = dogrudanBitis || N.addYearsIso(row.egitim_tarihi, gecerlilikYili);
+    // Eğitim tarihi Excel'de yoksa (yalnızca doğrudan bitiş tarihi varsa),
+    // gösterim amacıyla geriye doğru hesaplanır (bitiş - geçerlilik yılı).
+    const egitimTarihi = row.egitim_tarihi || N.addYearsIso(dogrudanBitis, -gecerlilikYili);
+
+    // HEAŞ'taki "Eğitim / Kurs-1" (Var/Yok) — kullanıcı geri bildirimi: "Yok"
+    // yazıyorsa eğitim KESİN süresi dolmuş sayılır, tarih hesabı ne derse
+    // desin; "Var" ise normal tarih+Dönemi hesabına göre değerlendirilir
+    // (bkz. egitimDurumu — zorla_suresi_dolmus tarih kontrolünden ÖNCE bakılır).
+    const gecerliMi = N.isVarDurumu(row.egitim_gecerlilik_ham, { defaultWhenMissing: null });
 
     const kayit = {
       id,
       tc_kimlik_no: row.tc_kimlik_no,
       kaynak,
-      egitim_tarihi: row.egitim_tarihi,
+      egitim_tarihi: egitimTarihi,
       gecerlilik_yili: gecerlilikYili,
-      gecerlilik_kaynagi: row.gecerlilik_yili ? "excel" : "varsayilan",
+      gecerlilik_kaynagi: dogrudanBitis ? "dogrudan_bitis" : row.gecerlilik_yili ? "excel" : "varsayilan",
       bitis_tarihi: bitisTarihi,
+      zorla_suresi_dolmus: gecerliMi === false,
+      gecerlilik_durumu_ham: row.egitim_gecerlilik_ham || "",
       import_id: importId,
       guncelleme_tarihi: N.todayIso(),
     };
@@ -305,11 +382,40 @@
   /** Eğitim durumu: Aktif / Yaklaşıyor / Süresi Dolmuş / Bilgi Yok */
   function egitimDurumu(kayit, esikGun) {
     if (!kayit || !kayit.bitis_tarihi) return "Bilgi Yok";
+    // Kaynak (örn. HEAŞ "Eğitim / Kurs-1") kesin olarak "Yok" diyorsa, tarih
+    // hesabı henüz dolmamış görünse bile eğitim süresi dolmuş sayılır.
+    if (kayit.zorla_suresi_dolmus) return "Süresi Dolmuş";
     const today = N.todayIso();
     const kalanGun = N.daysBetween(today, kayit.bitis_tarihi);
     if (kalanGun < 0) return "Süresi Dolmuş";
     if (kalanGun <= esikGun) return "Yaklaşıyor";
     return "Aktif";
+  }
+
+  // Genel durum özetinde (istatistik panelleri, Uyarılar sekmesi, filtreler)
+  // hangi durumun "kazandığını" belirleyen öncelik sırası — en kötü durum
+  // kazanır. Kullanıcı geri bildirimi: bir kişinin 3 havalimanından biri
+  // süresi dolmuşken en iyimser (en geç biten) kaydın genel durumu göstermesi
+  // sorunu gizliyordu (bkz. README/oturum notları — Yavuz Kalafat örneği).
+  // Genel Bakış tablosu artık her havalimanı için ayrı sütun gösteriyor
+  // (bkz. buildPivotRows egitim_by_havalimani); bu sıralama yalnızca TEK bir
+  // özet değer gereken yerlerde (istatistik kartları, Uyarılar, dışa aktarım
+  // özet sütunu) kullanılır ve kasıtlı olarak EN KÖTÜ durumu seçer, ki hiçbir
+  // kaynaktaki bir sorun diğerinin arkasında gizlenmesin.
+  const DURUM_ONCELIK = { "Süresi Dolmuş": 0, "Yaklaşıyor": 1, "Aktif": 2, "Bilgi Yok": 3 };
+
+  /**
+   * Birden çok havalimanının eğitim durumundan TEK bir özet durum üretir —
+   * en kötü (en öncelikli) durum kazanır. Tüm kaynaklar "Bilgi Yok" ise
+   * sonuç da "Bilgi Yok" olur.
+   */
+  function ozetEgitimDurumu(durumlarByHavalimani) {
+    let en = "Bilgi Yok";
+    HAVALIMANLARI.forEach((h) => {
+      const d = durumlarByHavalimani[h];
+      if (d && DURUM_ONCELIK[d] < DURUM_ONCELIK[en]) en = d;
+    });
+    return en;
   }
 
   /**
@@ -347,6 +453,18 @@
       const kendiEgitimleri = egitimlerByTc.get(tc) || [];
       const guncelEgitim = enGuncelEgitim(kendiEgitimleri);
 
+      // Havalimanı başına AYRI eğitim kaydı/durumu — kayıt id'si zaten
+      // tc__kaynak (kaynak = AHL/IGA_AO/HEAS) olduğundan havalimanı başına
+      // en fazla bir kayıt olur. Genel Bakış tablosu bunları 3 ayrı sütunda
+      // gösterir, tek bir "en iyimser kazanır" değere indirgemez.
+      const egitimByHavalimani = {};
+      const egitimDurumuByHavalimani = {};
+      HAVALIMANLARI.forEach((h) => {
+        const kayit = kendiEgitimleri.find((e) => e.kaynak === h) || null;
+        egitimByHavalimani[h] = kayit;
+        egitimDurumuByHavalimani[h] = egitimDurumu(kayit, settings.uyari_esik_gun);
+      });
+
       // Özel kaynaklardan gelen veri: { [kaynak_id]: { [alanKey]: değer, ... } }
       const kendiOzelVeri = ozelByTc.get(tc) || [];
       const ozel = {};
@@ -378,7 +496,11 @@
         havalimani_var: havalimaniVar,
         egitim_kayitlari: kendiEgitimleri,
         guncel_egitim: guncelEgitim,
-        egitim_durumu: egitimDurumu(guncelEgitim, settings.uyari_esik_gun),
+        egitim_by_havalimani: egitimByHavalimani,
+        egitim_durumu_by_havalimani: egitimDurumuByHavalimani,
+        // Tek özet değer (istatistik kartları, Uyarılar, filtreler, dışa
+        // aktarım) — en kötü havalimanı durumu kazanır, bkz. ozetEgitimDurumu.
+        egitim_durumu: ozetEgitimDurumu(egitimDurumuByHavalimani),
         custom: ozel,
       });
     }
@@ -421,6 +543,7 @@
     upsertEgitimKaydi,
     enGuncelEgitim,
     egitimDurumu,
+    ozetEgitimDurumu,
     buildPivotRows,
     getCustomKaynaklar,
     saveCustomKaynak,
